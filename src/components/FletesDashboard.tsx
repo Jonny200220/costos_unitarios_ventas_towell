@@ -1,8 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Table,
@@ -13,235 +11,188 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import fleteResumenRaw from '../database/fletes_resumen_cliente_mes.csv?raw';
-import fletesDetalleRaw from '../database/fletes_embarques.csv?raw';
-
-type ResumenRow = {
-  cliente: string;
-  flete_ene: number; flete_feb: number; flete_mar: number; flete_abr: number;
-  maniobra_ene: number; maniobra_feb: number; maniobra_mar: number; maniobra_abr: number;
-  total_fletes: number; total_maniobras: number;
-};
-
-type DetalleRow = {
-  folio: string; proveedor: string; cliente: string; vehiculo: string;
-  destino: string; fecha_envio: string; hora_carga: string; prioridad: string;
-  precio_flete: number; importe_otros: number; importe_agregados: number;
-  importe_total: number; flete: number; maniobras_y_otros: number; mes: string;
-};
-
-function parseCSV<T>(raw: string): T[] {
-  const lines = raw.trim().split('\n');
-  const headers = lines[0].split(',').map(h => h.trim());
-  return lines.slice(1).filter(l => l.trim()).map(line => {
-    const vals = line.split(',');
-    const obj: Record<string, string | number> = {};
-    headers.forEach((h, i) => {
-      const v = (vals[i] ?? '').trim();
-      obj[h] = isNaN(Number(v)) || v === '' ? v : Number(v);
-    });
-    return obj as T;
-  });
-}
+import SalesFilterSidebar from './SalesFilterSidebar';
+import TablePagination from './TablePagination';
+import { useSalesData } from '../hooks/useSalesData';
+import { usePagination } from '../hooks/usePagination';
 
 function fmt(n: number) {
   return `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-const MESES = ['ene', 'feb', 'mar', 'abr'];
-
 export default function FletesDashboard() {
-  const [mesFilter, setMesFilter] = useState<string>('todos');
-  const [search, setSearch] = useState('');
+  const { filtered, filters, setFilter, resetFilters, options } = useSalesData();
 
-  const resumen = useMemo(() => parseCSV<ResumenRow>(fleteResumenRaw), []);
-  const detalle = useMemo(() => parseCSV<DetalleRow>(fletesDetalleRaw), []);
+  const totalFlete = filtered.reduce((s, r) => s + r.monto_fle, 0);
+  const totalManiobras = filtered.reduce((s, r) => s + r.monto_myo, 0);
+  const totalGeneral = totalFlete + totalManiobras;
 
-  const totalFletes = resumen.reduce((s, r) => s + r.total_fletes, 0);
-  const totalManiobras = resumen.reduce((s, r) => s + r.total_maniobras, 0);
-  const totalGeneral = totalFletes + totalManiobras;
-
-  const detalleFiltered = useMemo(() => {
-    return detalle.filter(r => {
-      const matchMes = mesFilter === 'todos' || r.mes === mesFilter;
-      const matchSearch = search === '' ||
-        r.cliente.toLowerCase().includes(search.toLowerCase()) ||
-        r.folio.toLowerCase().includes(search.toLowerCase()) ||
-        r.destino.toLowerCase().includes(search.toLowerCase());
-      return matchMes && matchSearch;
+  const byCliente = useMemo<{ cliente: string; flete: number; maniobras: number; ventas: number; total: number }[]>(() => {
+    const map: Record<string, { flete: number; maniobras: number; ventas: number }> = {};
+    filtered.forEach(r => {
+      if (!map[r.nombre_cliente]) map[r.nombre_cliente] = { flete: 0, maniobras: 0, ventas: 0 };
+      map[r.nombre_cliente].flete += r.monto_fle;
+      map[r.nombre_cliente].maniobras += r.monto_myo;
+      map[r.nombre_cliente].ventas += r.importe;
     });
-  }, [detalle, mesFilter, search]);
+    return Object.entries(map)
+      .map(([cliente, v]) => ({ cliente, ...v, total: v.flete + v.maniobras }))
+      .sort((a, b) => b.total - a.total);
+  }, [filtered]);
 
-  const resumenFiltered = useMemo(() => {
-    return resumen.filter(r =>
-      search === '' || r.cliente.toLowerCase().includes(search.toLowerCase())
-    );
-  }, [resumen, search]);
+  const resumenPag = usePagination(byCliente, 25);
+  const detallePag = usePagination(filtered, 50);
 
   return (
-    <div>
-      {/* KPI Cards */}
-      <div className="grid grid-cols-3 gap-4 mb-5">
-        <Card size="sm">
-          <CardContent>
-            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Fletes</div>
-            <div className="text-2xl font-bold text-[#1e2a5e]">{fmt(totalFletes)}</div>
-          </CardContent>
-        </Card>
-        <Card size="sm">
-          <CardContent>
-            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Maniobras</div>
-            <div className="text-2xl font-bold text-orange-500">{fmt(totalManiobras)}</div>
-          </CardContent>
-        </Card>
-        <Card size="sm">
-          <CardContent>
-            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total General</div>
-            <div className="text-2xl font-bold text-green-600">{fmt(totalGeneral)}</div>
-          </CardContent>
-        </Card>
-      </div>
+    <div className="flex gap-5">
+      <SalesFilterSidebar
+        filters={filters}
+        options={options}
+        onFilter={setFilter}
+        onReset={resetFilters}
+        resultCount={filtered.length}
+      />
 
-      <Tabs defaultValue="resumen">
-        {/* Controles */}
-        <div className="flex items-center gap-3 mb-4 flex-wrap">
-          <TabsList className="bg-white ring-1 ring-foreground/10 shadow-xs h-9">
-            <TabsTrigger value="resumen" className="data-active:bg-[#1e2a5e] data-active:text-white text-sm">
-              Resumen
-            </TabsTrigger>
-            <TabsTrigger value="detalle" className="data-active:bg-[#1e2a5e] data-active:text-white text-sm">
-              Detalle
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="detalle" className="mt-0 flex gap-1">
-            {(['todos', ...MESES] as string[]).map(m => (
-              <Button
-                key={m}
-                variant={mesFilter === m ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setMesFilter(m)}
-                className={mesFilter === m ? 'bg-[#1e2a5e] hover:bg-[#1e2a5e]/90' : ''}
-              >
-                {m === 'todos' ? 'Todos' : m.toUpperCase()}
-              </Button>
-            ))}
-          </TabsContent>
-
-          <Input
-            placeholder="Buscar cliente, folio, destino..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-64 h-9 text-sm"
-          />
+      <div className="flex-1 min-w-0">
+        {/* KPI Cards */}
+        <div className="grid grid-cols-3 gap-4 mb-5">
+          <Card size="sm">
+            <CardContent>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Fletes</div>
+              <div className="text-2xl font-bold text-[#1e2a5e]">{fmt(totalFlete)}</div>
+            </CardContent>
+          </Card>
+          <Card size="sm">
+            <CardContent>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Maniobras</div>
+              <div className="text-2xl font-bold text-orange-500">{fmt(totalManiobras)}</div>
+            </CardContent>
+          </Card>
+          <Card size="sm">
+            <CardContent>
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total General</div>
+              <div className="text-2xl font-bold text-green-600">{fmt(totalGeneral)}</div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Tabla Resumen */}
-        <TabsContent value="resumen" className="mt-0">
-          <div className="rounded-xl overflow-auto ring-1 ring-foreground/10 shadow-xs">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
-                  <TableHead className="text-white font-semibold sticky left-0 bg-[#1e2a5e]">Cliente</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Flete Ene</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Flete Feb</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Flete Mar</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Flete Abr</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Maniobra Ene</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Maniobra Feb</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Maniobra Mar</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Maniobra Abr</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Total Fletes</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Total Maniobras</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {resumenFiltered.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-medium">{r.cliente}</TableCell>
-                    <TableCell className="text-right">{r.flete_ene > 0 ? fmt(r.flete_ene) : '—'}</TableCell>
-                    <TableCell className="text-right">{r.flete_feb > 0 ? fmt(r.flete_feb) : '—'}</TableCell>
-                    <TableCell className="text-right">{r.flete_mar > 0 ? fmt(r.flete_mar) : '—'}</TableCell>
-                    <TableCell className="text-right">{r.flete_abr > 0 ? fmt(r.flete_abr) : '—'}</TableCell>
-                    <TableCell className="text-right">{r.maniobra_ene > 0 ? fmt(r.maniobra_ene) : '—'}</TableCell>
-                    <TableCell className="text-right">{r.maniobra_feb > 0 ? fmt(r.maniobra_feb) : '—'}</TableCell>
-                    <TableCell className="text-right">{r.maniobra_mar > 0 ? fmt(r.maniobra_mar) : '—'}</TableCell>
-                    <TableCell className="text-right">{r.maniobra_abr > 0 ? fmt(r.maniobra_abr) : '—'}</TableCell>
-                    <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmt(r.total_fletes)}</TableCell>
-                    <TableCell className="text-right font-semibold text-orange-500">{r.total_maniobras > 0 ? fmt(r.total_maniobras) : '—'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
-                  <TableCell>TOTAL</TableCell>
-                  <TableCell className="text-right">{fmt(resumenFiltered.reduce((s,r)=>s+r.flete_ene,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(resumenFiltered.reduce((s,r)=>s+r.flete_feb,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(resumenFiltered.reduce((s,r)=>s+r.flete_mar,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(resumenFiltered.reduce((s,r)=>s+r.flete_abr,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(resumenFiltered.reduce((s,r)=>s+r.maniobra_ene,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(resumenFiltered.reduce((s,r)=>s+r.maniobra_feb,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(resumenFiltered.reduce((s,r)=>s+r.maniobra_mar,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(resumenFiltered.reduce((s,r)=>s+r.maniobra_abr,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(resumenFiltered.reduce((s,r)=>s+r.total_fletes,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(resumenFiltered.reduce((s,r)=>s+r.total_maniobras,0))}</TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
-          </div>
-        </TabsContent>
+        <Tabs defaultValue="resumen">
+          <TabsList className="bg-white ring-1 ring-foreground/10 shadow-xs h-9 mb-4">
+            <TabsTrigger value="resumen" className="text-sm">Resumen por Cliente</TabsTrigger>
+            <TabsTrigger value="detalle" className="text-sm">Detalle por Línea</TabsTrigger>
+          </TabsList>
 
-        {/* Tabla Detalle */}
-        <TabsContent value="detalle" className="mt-0">
-          <div className="rounded-xl overflow-auto ring-1 ring-foreground/10 shadow-xs">
-            <div className="px-4 py-2 text-xs text-muted-foreground border-b border-border">
-              {detalleFiltered.length} registros
+          {/* Resumen agrupado por cliente */}
+          <TabsContent value="resumen" className="mt-0">
+            <div className="rounded-xl overflow-hidden ring-1 ring-foreground/10 shadow-xs">
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
+                      <TableHead className="text-white font-semibold">Cliente</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Ventas</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Fletes</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Maniobras</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Total Logística</TableHead>
+                      <TableHead className="text-white font-semibold text-right">% s/Ventas</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {resumenPag.paged.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{r.cliente}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{fmt(r.ventas)}</TableCell>
+                        <TableCell className="text-right">{r.flete > 0 ? fmt(r.flete) : '—'}</TableCell>
+                        <TableCell className="text-right">{r.maniobras > 0 ? fmt(r.maniobras) : '—'}</TableCell>
+                        <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmt(r.total)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {r.ventas > 0 ? ((r.total / r.ventas) * 100).toFixed(2) : '—'}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
+                      <TableCell>TOTAL ({byCliente.length} clientes)</TableCell>
+                      <TableCell className="text-right">{fmt(byCliente.reduce((s,r)=>s+r.ventas,0))}</TableCell>
+                      <TableCell className="text-right">{fmt(totalFlete)}</TableCell>
+                      <TableCell className="text-right">{fmt(totalManiobras)}</TableCell>
+                      <TableCell className="text-right">{fmt(totalGeneral)}</TableCell>
+                      <TableCell className="text-right">
+                        {byCliente.reduce((s,r)=>s+r.ventas,0) > 0
+                          ? ((totalGeneral / byCliente.reduce((s,r)=>s+r.ventas,0)) * 100).toFixed(2)
+                          : '—'}%
+                      </TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
+              <TablePagination
+                page={resumenPag.page}
+                totalPages={resumenPag.totalPages}
+                totalItems={byCliente.length}
+                pageSize={resumenPag.pageSize}
+                onPageChange={resumenPag.setPage}
+              />
             </div>
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
-                  <TableHead className="text-white font-semibold">Folio</TableHead>
-                  <TableHead className="text-white font-semibold">Proveedor</TableHead>
-                  <TableHead className="text-white font-semibold">Cliente</TableHead>
-                  <TableHead className="text-white font-semibold">Vehículo</TableHead>
-                  <TableHead className="text-white font-semibold">Destino</TableHead>
-                  <TableHead className="text-white font-semibold">Fecha</TableHead>
-                  <TableHead className="text-white font-semibold text-center">Mes</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Flete</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Maniobras</TableHead>
-                  <TableHead className="text-white font-semibold text-right">Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {detalleFiltered.map((r, i) => (
-                  <TableRow key={i}>
-                    <TableCell className="font-mono text-xs">{r.folio}</TableCell>
-                    <TableCell>{r.proveedor}</TableCell>
-                    <TableCell className="font-medium">{r.cliente}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.vehiculo}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.destino}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.fecha_envio}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="secondary" className="uppercase text-xs">{r.mes}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">{fmt(r.flete)}</TableCell>
-                    <TableCell className="text-right">{r.maniobras_y_otros > 0 ? fmt(r.maniobras_y_otros) : '—'}</TableCell>
-                    <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmt(r.importe_total)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
-                  <TableCell colSpan={7}>TOTAL ({detalleFiltered.length} registros)</TableCell>
-                  <TableCell className="text-right">{fmt(detalleFiltered.reduce((s,r)=>s+r.flete,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(detalleFiltered.reduce((s,r)=>s+r.maniobras_y_otros,0))}</TableCell>
-                  <TableCell className="text-right">{fmt(detalleFiltered.reduce((s,r)=>s+r.importe_total,0))}</TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
-          </div>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+
+          {/* Detalle por línea de venta */}
+          <TabsContent value="detalle" className="mt-0">
+            <div className="rounded-xl overflow-hidden ring-1 ring-foreground/10 shadow-xs">
+              <div className="overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
+                      <TableHead className="text-white font-semibold">Cliente</TableHead>
+                      <TableHead className="text-white font-semibold">Artículo</TableHead>
+                      <TableHead className="text-white font-semibold">Tamaño</TableHead>
+                      <TableHead className="text-white font-semibold">Color</TableHead>
+                      <TableHead className="text-white font-semibold text-center">Mes</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Importe Venta</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Flete</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Maniobras</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detallePag.paged.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium max-w-[160px] truncate" title={r.nombre_cliente}>{r.nombre_cliente}</TableCell>
+                        <TableCell className="max-w-[180px] truncate" title={r.nombre_articulo}>{r.nombre_articulo}</TableCell>
+                        <TableCell>{r.tamano}</TableCell>
+                        <TableCell>{r.color}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" className="uppercase text-xs">{r.mes}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">{fmt(r.importe)}</TableCell>
+                        <TableCell className="text-right">{r.monto_fle > 0 ? fmt(r.monto_fle) : '—'}</TableCell>
+                        <TableCell className="text-right">{r.monto_myo > 0 ? fmt(r.monto_myo) : '—'}</TableCell>
+                        <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmt(r.monto_fle + r.monto_myo)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
+                      <TableCell colSpan={6}>TOTAL ({filtered.length} registros)</TableCell>
+                      <TableCell className="text-right">{fmt(totalFlete)}</TableCell>
+                      <TableCell className="text-right">{fmt(totalManiobras)}</TableCell>
+                      <TableCell className="text-right">{fmt(totalGeneral)}</TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              </div>
+              <TablePagination
+                page={detallePag.page}
+                totalPages={detallePag.totalPages}
+                totalItems={filtered.length}
+                pageSize={detallePag.pageSize}
+                onPageChange={detallePag.setPage}
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
