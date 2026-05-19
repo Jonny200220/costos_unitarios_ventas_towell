@@ -15,6 +15,7 @@ export type SalesRow = {
   empresa: string;
   tipo_pedido: string;
   cantidad: number;
+  peso_std: number;
   importe: number;
   monto_me: number;
   monto_fle: number;
@@ -79,6 +80,7 @@ function parseRaw(raw: string): SalesRow[] {
       empresa: g('empresa'),
       tipo_pedido: g('tipo_pedido'),
       cantidad: n('cantidad'),
+      peso_std: n('peso_std'),
       importe: n('importe'),
       monto_me: n('monto_me'),
       monto_fle: n('monto_fle'),

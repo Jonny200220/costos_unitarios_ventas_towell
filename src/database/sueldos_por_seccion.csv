@@ -1,0 +1,40 @@
+﻿id,seccion,subseccion,puesto,sueldo_mensual_bruto
+001,Administración,,Gerente,25000
+002,Administración,,Jefe de Área,15000
+003,Administración,,Jefe de Área,15000
+004,Administración,,Jefe de Área,15000
+005,Administración,,Jefe de Área,15000
+006,Administración,,Jefe de Área,15000
+007,Administración,,Auxiliar Administrativo,10000
+008,Preparación,,Jefe de Área,16000
+009,Preparación,,Operativo de Preparación,8500
+010,Preparación,,Operativo de Preparación,8500
+011,Preparación,,Operativo de Preparación,8500
+012,Preparación,,Operativo de Preparación,8500
+013,Preparación,,Operativo de Preparación,8500
+014,Preparación,,Operativo de Preparación,8500
+015,Preparación,,Operativo de Preparación,8500
+016,Preparación,,Operativo de Preparación,8500
+017,Preparación,,Operativo de Preparación,8500
+018,Preparación,,Operativo de Preparación,8500
+019,Preparación,,Operativo de Preparación,8500
+020,Preparación,,Operativo de Preparación,8500
+021,Preparación,,Operativo de Preparación,8500
+022,Preparación,,Operativo de Preparación,8500
+023,Almacén,,Jefe de Área,16000
+024,Almacén,CUBO,Operativo,9000
+025,Almacén,CUBO,Operativo,9000
+026,Almacén,CUBO,Operativo,9000
+027,Almacén,Surtido,Operativo,8500
+028,Almacén,Surtido,Operativo,8500
+029,Almacén,Surtido,Operativo,8500
+030,Almacén,Surtido,Operativo,8500
+031,Almacén,Surtido,Operativo,8500
+032,Almacén,Surtido,Operativo,8500
+033,Almacén,Surtido,Operativo,8500
+034,Almacén,Surtido,Operativo,8500
+035,Almacén,Surtido,Operativo,8500
+036,Embarques,,Jefe de Área,16000
+037,Embarques,,Operativo de Embarque,9000
+038,Embarques,,Operativo de Embarque,9000
+039,Embarques,,Operativo de Embarque,9000

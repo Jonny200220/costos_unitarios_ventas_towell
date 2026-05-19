@@ -45,11 +45,11 @@ export default function Dashboard({ title, soloData, engomadoData: _engomadoData
           ))}
         </TabsList>
 
-        <TabsContent value="fletes">
+        <TabsContent value="fletes" forceMount className="data-[state=inactive]:hidden">
           <FletesDashboard />
         </TabsContent>
 
-        <TabsContent value="me">
+        <TabsContent value="me" forceMount className="data-[state=inactive]:hidden">
           <MaterialEmpaqueDashboard />
         </TabsContent>
 

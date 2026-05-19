@@ -27,18 +27,21 @@ export default function FletesDashboard() {
   const totalManiobras = filtered.reduce((s, r) => s + r.monto_myo, 0);
   const totalGeneral = totalFlete + totalManiobras;
 
-  const byCliente = useMemo<{ cliente: string; flete: number; maniobras: number; ventas: number; total: number }[]>(() => {
-    const map: Record<string, { flete: number; maniobras: number; ventas: number }> = {};
+  const byCliente = useMemo<{ cliente: string; flete: number; maniobras: number; ventas: number; total: number; peso: number }[]>(() => {
+    const map: Record<string, { flete: number; maniobras: number; ventas: number; peso: number }> = {};
     filtered.forEach(r => {
-      if (!map[r.nombre_cliente]) map[r.nombre_cliente] = { flete: 0, maniobras: 0, ventas: 0 };
+      if (!map[r.nombre_cliente]) map[r.nombre_cliente] = { flete: 0, maniobras: 0, ventas: 0, peso: 0 };
       map[r.nombre_cliente].flete += r.monto_fle;
       map[r.nombre_cliente].maniobras += r.monto_myo;
       map[r.nombre_cliente].ventas += r.importe;
+      map[r.nombre_cliente].peso += r.peso_std;
     });
     return Object.entries(map)
       .map(([cliente, v]) => ({ cliente, ...v, total: v.flete + v.maniobras }))
       .sort((a, b) => b.total - a.total);
   }, [filtered]);
+
+  const totalPeso = filtered.reduce((s, r) => s + r.peso_std, 0);
 
   const resumenPag = usePagination(byCliente, 25);
   const detallePag = usePagination(filtered, 50);
@@ -92,7 +95,9 @@ export default function FletesDashboard() {
                       <TableHead className="text-white font-semibold">Cliente</TableHead>
                       <TableHead className="text-white font-semibold text-right">Ventas</TableHead>
                       <TableHead className="text-white font-semibold text-right">Fletes</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Cuota Flete ($/kg)</TableHead>
                       <TableHead className="text-white font-semibold text-right">Maniobras</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Cuota Maniobras ($/kg)</TableHead>
                       <TableHead className="text-white font-semibold text-right">Total Logística</TableHead>
                       <TableHead className="text-white font-semibold text-right">% s/Ventas</TableHead>
                     </TableRow>
@@ -103,8 +108,14 @@ export default function FletesDashboard() {
                         <TableCell className="font-medium">{r.cliente}</TableCell>
                         <TableCell className="text-right text-muted-foreground">{fmt(r.ventas)}</TableCell>
                         <TableCell className="text-right">{r.flete > 0 ? fmt(r.flete) : '—'}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {r.peso > 0 ? `$${(r.flete / r.peso).toFixed(2)}` : '—'}
+                        </TableCell>
                         <TableCell className="text-right">{r.maniobras > 0 ? fmt(r.maniobras) : '—'}</TableCell>
-                        <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmt(r.total)}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {r.peso > 0 && r.maniobras > 0 ? `$${(r.maniobras / r.peso).toFixed(2)}` : '—'}
+                        </TableCell>
+                        <TableCell className="text-right">{r.total > 0 ? fmt(r.total) : '—'}</TableCell>
                         <TableCell className="text-right text-muted-foreground">
                           {r.ventas > 0 ? ((r.total / r.ventas) * 100).toFixed(2) : '—'}%
                         </TableCell>
@@ -116,7 +127,13 @@ export default function FletesDashboard() {
                       <TableCell>TOTAL ({byCliente.length} clientes)</TableCell>
                       <TableCell className="text-right">{fmt(byCliente.reduce((s,r)=>s+r.ventas,0))}</TableCell>
                       <TableCell className="text-right">{fmt(totalFlete)}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {totalPeso > 0 ? `$${(totalFlete / totalPeso).toFixed(2)}` : '—'}
+                      </TableCell>
                       <TableCell className="text-right">{fmt(totalManiobras)}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {totalPeso > 0 ? `$${(totalManiobras / totalPeso).toFixed(2)}` : '—'}
+                      </TableCell>
                       <TableCell className="text-right">{fmt(totalGeneral)}</TableCell>
                       <TableCell className="text-right">
                         {byCliente.reduce((s,r)=>s+r.ventas,0) > 0
@@ -151,7 +168,9 @@ export default function FletesDashboard() {
                       <TableHead className="text-white font-semibold text-center">Mes</TableHead>
                       <TableHead className="text-white font-semibold text-right">Importe Venta</TableHead>
                       <TableHead className="text-white font-semibold text-right">Flete</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Cuota Flete ($/kg)</TableHead>
                       <TableHead className="text-white font-semibold text-right">Maniobras</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Cuota Maniobras ($/kg)</TableHead>
                       <TableHead className="text-white font-semibold text-right">Total</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -167,7 +186,13 @@ export default function FletesDashboard() {
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">{fmt(r.importe)}</TableCell>
                         <TableCell className="text-right">{r.monto_fle > 0 ? fmt(r.monto_fle) : '—'}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {r.peso_std > 0 && r.monto_fle > 0 ? `$${(r.monto_fle / r.peso_std).toFixed(4)}` : '—'}
+                        </TableCell>
                         <TableCell className="text-right">{r.monto_myo > 0 ? fmt(r.monto_myo) : '—'}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {r.peso_std > 0 && r.monto_myo > 0 ? `$${(r.monto_myo / r.peso_std).toFixed(4)}` : '—'}
+                        </TableCell>
                         <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmt(r.monto_fle + r.monto_myo)}</TableCell>
                       </TableRow>
                     ))}
@@ -176,7 +201,13 @@ export default function FletesDashboard() {
                     <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
                       <TableCell colSpan={6}>TOTAL ({filtered.length} registros)</TableCell>
                       <TableCell className="text-right">{fmt(totalFlete)}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {totalPeso > 0 ? `$${(totalFlete / totalPeso).toFixed(4)}` : '—'}
+                      </TableCell>
                       <TableCell className="text-right">{fmt(totalManiobras)}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {totalPeso > 0 ? `$${(totalManiobras / totalPeso).toFixed(4)}` : '—'}
+                      </TableCell>
                       <TableCell className="text-right">{fmt(totalGeneral)}</TableCell>
                     </TableRow>
                   </TableFooter>
