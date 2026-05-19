@@ -93,7 +93,7 @@ function unique(arr: string[]): string[] {
   return Array.from(new Set(arr.filter(v => v && v.trim()))).sort();
 }
 
-const ALL_ROWS: SalesRow[] = parseRaw(baseVentasRaw);
+export const ALL_ROWS: SalesRow[] = parseRaw(baseVentasRaw);
 
 const OPTIONS = {
   codigo_articulo: unique(ALL_ROWS.map(r => r.codigo_articulo)),

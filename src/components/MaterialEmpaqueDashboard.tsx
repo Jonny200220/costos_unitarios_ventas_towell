@@ -30,17 +30,20 @@ export default function MaterialEmpaqueDashboard() {
     filtered.filter(r => r.mes === m).reduce((s, r) => s + r.monto_me, 0)
   );
 
-  const byCliente = useMemo<{ cliente: string; me: number; ventas: number }[]>(() => {
-    const map: Record<string, { me: number; ventas: number }> = {};
+  const byCliente = useMemo<{ cliente: string; me: number; ventas: number; peso: number }[]>(() => {
+    const map: Record<string, { me: number; ventas: number; peso: number }> = {};
     filtered.forEach(r => {
-      if (!map[r.nombre_cliente]) map[r.nombre_cliente] = { me: 0, ventas: 0 };
+      if (!map[r.nombre_cliente]) map[r.nombre_cliente] = { me: 0, ventas: 0, peso: 0 };
       map[r.nombre_cliente].me += r.monto_me;
       map[r.nombre_cliente].ventas += r.importe;
+      map[r.nombre_cliente].peso += r.peso_std;
     });
     return Object.entries(map)
       .map(([cliente, v]) => ({ cliente, ...v }))
       .sort((a, b) => b.me - a.me);
   }, [filtered]);
+
+  const totalPeso = useMemo(() => filtered.reduce((s, r) => s + r.peso_std, 0), [filtered]);
 
   const resumenPag = usePagination(byCliente, 25);
   const detallePag = usePagination(filtered, 50);
@@ -90,6 +93,7 @@ export default function MaterialEmpaqueDashboard() {
                       <TableHead className="text-white font-semibold">Cliente</TableHead>
                       <TableHead className="text-white font-semibold text-right">Ventas</TableHead>
                       <TableHead className="text-white font-semibold text-right">Mat. Empaque</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Cuota ME ($/kg)</TableHead>
                       <TableHead className="text-white font-semibold text-right">% s/Ventas</TableHead>
                       <TableHead className="text-white font-semibold text-right">% del Total ME</TableHead>
                     </TableRow>
@@ -100,6 +104,9 @@ export default function MaterialEmpaqueDashboard() {
                         <TableCell className="font-medium">{r.cliente}</TableCell>
                         <TableCell className="text-right text-muted-foreground">{fmt(r.ventas)}</TableCell>
                         <TableCell className="text-right font-semibold text-[#1e2a5e]">{r.me > 0 ? fmt(r.me) : '—'}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {r.peso > 0 && r.me > 0 ? `$${(r.me / r.peso).toFixed(2)}` : '—'}
+                        </TableCell>
                         <TableCell className="text-right text-muted-foreground">
                           {r.ventas > 0 ? ((r.me / r.ventas) * 100).toFixed(2) : '—'}%
                         </TableCell>
@@ -114,6 +121,9 @@ export default function MaterialEmpaqueDashboard() {
                       <TableCell>TOTAL ({byCliente.length} clientes)</TableCell>
                       <TableCell className="text-right">{fmt(byCliente.reduce((s,r)=>s+r.ventas,0))}</TableCell>
                       <TableCell className="text-right">{fmt(totalGeneral)}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {totalPeso > 0 ? `$${(totalGeneral / totalPeso).toFixed(2)}` : '—'}
+                      </TableCell>
                       <TableCell className="text-right">
                         {byCliente.reduce((s,r)=>s+r.ventas,0) > 0
                           ? ((totalGeneral / byCliente.reduce((s,r)=>s+r.ventas,0)) * 100).toFixed(2)
@@ -151,6 +161,7 @@ export default function MaterialEmpaqueDashboard() {
                       <TableHead className="text-white font-semibold text-right">Cantidad</TableHead>
                       <TableHead className="text-white font-semibold text-right">Importe Venta</TableHead>
                       <TableHead className="text-white font-semibold text-right">Mat. Empaque</TableHead>
+                      <TableHead className="text-white font-semibold text-right">Cuota ME ($/kg)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -168,6 +179,9 @@ export default function MaterialEmpaqueDashboard() {
                         <TableCell className="text-right">{r.cantidad.toLocaleString('es-MX')}</TableCell>
                         <TableCell className="text-right text-muted-foreground">{fmt(r.importe)}</TableCell>
                         <TableCell className="text-right font-semibold text-[#1e2a5e]">{r.monto_me > 0 ? fmt(r.monto_me) : '—'}</TableCell>
+                        <TableCell className="text-right font-semibold">
+                          {r.peso_std > 0 && r.monto_me > 0 ? `$${(r.monto_me / r.peso_std).toFixed(2)}` : '—'}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -175,6 +189,9 @@ export default function MaterialEmpaqueDashboard() {
                     <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
                       <TableCell colSpan={9}>TOTAL ({filtered.length} registros)</TableCell>
                       <TableCell className="text-right">{fmt(totalGeneral)}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {totalPeso > 0 ? `$${(totalGeneral / totalPeso).toFixed(2)}` : '—'}
+                      </TableCell>
                     </TableRow>
                   </TableFooter>
                 </Table>
