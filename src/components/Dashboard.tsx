@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import type { ProductConfig } from '../data/mockData';
 import FilterSidebar from './FilterSidebar';
 import KpiCards from './KpiCards';
 import Charts from './Charts';
 import CostTable from './CostTable';
+import FletesDashboard from './FletesDashboard';
+import MaterialEmpaqueDashboard from './MaterialEmpaqueDashboard';
 
-type DashTab = 'solo' | 'engomado';
+type CostTab = 'resumen' | 'administracion' | 'surtido' | 'preparacion' | 'embarque' | 'me' | 'fletes';
 
 interface Props {
   title: string;
@@ -13,44 +16,59 @@ interface Props {
   engomadoData: ProductConfig;
 }
 
-export default function Dashboard({ title, soloData, engomadoData }: Props) {
-  const [tab, setTab] = useState<DashTab>('solo');
-  const data = tab === 'solo' ? soloData : engomadoData;
+const COST_TABS: { label: string; value: CostTab }[] = [
+  { label: 'Resumen', value: 'resumen' },
+  { label: 'Administración', value: 'administracion' },
+  { label: 'Surtido', value: 'surtido' },
+  { label: 'Preparación', value: 'preparacion' },
+  { label: 'Embarque', value: 'embarque' },
+  { label: 'Material de Empaque', value: 'me' },
+  { label: 'Fletes', value: 'fletes' },
+];
 
-  const tabBtn = (label: string, value: DashTab) => (
-    <button
-      onClick={() => setTab(value)}
-      className={`px-5 py-1.5 rounded-full text-sm font-medium transition-colors ${
-        tab === value
-          ? 'bg-[#1e2a5e] text-white shadow'
-          : 'text-gray-600 hover:bg-gray-200'
-      }`}
-    >
-      {label}
-    </button>
-  );
+export default function Dashboard({ title, soloData, engomadoData: _engomadoData }: Props) {
+  const [costTab, setCostTab] = useState<CostTab>('resumen');
+  const data = soloData;
 
   return (
     <div className="p-5">
-      {/* Sub-tabs */}
-      <div className="flex items-center gap-2 mb-5 bg-white rounded-full px-2 py-1 w-fit shadow-sm border border-gray-100">
-        {tabBtn('Solo Urdido', 'solo')}
-        {tabBtn('Urdido + Engomado', 'engomado')}
-        <button className="px-5 py-1.5 rounded-full text-sm font-medium text-gray-500 hover:bg-gray-200 transition-colors">
-          Tejido
-        </button>
-      </div>
+      <Tabs value={costTab} onValueChange={v => setCostTab(v as CostTab)}>
+        <TabsList className="mb-5 h-auto flex-wrap gap-1 bg-white ring-1 ring-foreground/10 shadow-xs p-1">
+          {COST_TABS.map(({ label, value }) => (
+            <TabsTrigger
+              key={value}
+              value={value}
+              className="data-active:bg-[#1e2a5e] data-active:text-white data-active:shadow text-sm"
+            >
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <div className="text-lg font-bold text-gray-700 mb-4">{title}</div>
+        <TabsContent value="fletes">
+          <FletesDashboard />
+        </TabsContent>
 
-      <div className="flex gap-5">
-        <FilterSidebar data={data} />
-        <div className="flex-1 min-w-0">
-          <KpiCards data={data} />
-          <Charts data={data} />
-          <CostTable rows={data.rows} />
-        </div>
-      </div>
+        <TabsContent value="me">
+          <MaterialEmpaqueDashboard />
+        </TabsContent>
+
+        {COST_TABS.filter(t => t.value !== 'fletes' && t.value !== 'me').map(({ value }) => (
+          <TabsContent key={value} value={value}>
+            <div className="text-lg font-bold text-foreground mb-4">
+              {title} — {value.charAt(0).toUpperCase() + value.slice(1)}
+            </div>
+            <div className="flex gap-5">
+              <FilterSidebar data={data} />
+              <div className="flex-1 min-w-0">
+                <KpiCards data={data} />
+                <Charts data={data} />
+                <CostTable rows={data.rows} />
+              </div>
+            </div>
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   );
 }
