@@ -22,7 +22,7 @@ interface Props {
 const COST_TABS: { label: string; value: CostTab }[] = [
   { label: 'Resumen', value: 'resumen' },
   { label: 'Administración', value: 'administracion' },
-  { label: 'Surtido', value: 'surtido' },
+  { label: 'Almacén', value: 'surtido' },
   { label: 'Preparación', value: 'preparacion' },
   { label: 'Embarque', value: 'embarque' },
   { label: 'Material de Empaque', value: 'me' },

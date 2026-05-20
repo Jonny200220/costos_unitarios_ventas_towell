@@ -11,6 +11,7 @@ import { ALL_ROWS } from '../hooks/useSalesData';
 import { usePagination } from '../hooks/usePagination';
 import TablePagination from './TablePagination';
 import nominaResumenRaw from '../database/nomina_resumen_seccion_mes.csv?raw';
+import nominaPlantillaRaw from '../database/nomina_plantilla.csv?raw';
 
 function fmt2(n: number) {
   return `$${n.toFixed(2)}`;
@@ -40,6 +41,39 @@ type ItemResumen = {
 };
 
 const NOMINA_TOTALES = parseNominaResumen(nominaResumenRaw);
+
+function parsePlantilla(raw: string) {
+  const lines = raw.trim().split('\n').filter(l => l.trim());
+  const headers = lines[0].split(',').map(h => h.trim());
+  return lines.slice(1)
+    .map(line => {
+      const cols = line.split(',').map(c => c.trim());
+      return Object.fromEntries(headers.map((h, i) => [h, cols[i] ?? '']));
+    })
+    .filter(r => r['ID'] && r['ID'] !== 'ID' && r['ID'] !== 'TOTAL');
+}
+
+const PLANTILLA_ROWS = parsePlantilla(nominaPlantillaRaw);
+
+const PERSONAL_POR_SECCION = (() => {
+  const map: Record<string, { puestos: Record<string, number>; total: number; sueldoTotal: number }> = {};
+  PLANTILLA_ROWS.forEach(r => {
+    const sec = r['Sección'];
+    const subsec = r['Subsección']?.trim();
+    const puesto = subsec
+      ? `${subsec} — ${r['Puesto'] || '(Sin puesto)'}`
+      : r['Puesto'] || '(Sin puesto)';
+    const sueldo = Number(r['Sueldo Mensual Bruto']) || 0;
+    if (!map[sec]) map[sec] = { puestos: {}, total: 0, sueldoTotal: 0 };
+    map[sec].puestos[puesto] = (map[sec].puestos[puesto] || 0) + 1;
+    map[sec].total += 1;
+    map[sec].sueldoTotal += sueldo;
+  });
+  return map;
+})();
+
+const TOTAL_PERSONAL = PLANTILLA_ROWS.length;
+const TOTAL_SUELDO_PLANTILLA = PLANTILLA_ROWS.reduce((s, r) => s + (Number(r['Sueldo Mensual Bruto']) || 0), 0);
 
 
 function buildRowsFiltered(key: 'nombre_cliente' | 'nombre_articulo', tamano: string): ItemResumen[] {
@@ -291,6 +325,55 @@ export default function ResumenDashboard() {
           pageSize={pag.pageSize}
           onPageChange={pag.setPage}
         />
+      </div>
+
+      {/* Tabla de personal por sección */}
+      <div className="rounded-xl overflow-hidden ring-1 ring-foreground/10 shadow-xs">
+        <div className="overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
+                <TableHead className="text-white font-semibold">Sección</TableHead>
+                <TableHead className="text-white font-semibold">Puesto</TableHead>
+                <TableHead className="text-white font-semibold text-right">Personas</TableHead>
+                <TableHead className="text-white font-semibold text-right">Sueldo Mensual Unit.</TableHead>
+                <TableHead className="text-white font-semibold text-right">Sueldo Total Sección</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Object.entries(PERSONAL_POR_SECCION).map(([seccion, data]) =>
+                Object.entries(data.puestos).map(([puesto, count], j) => {
+                  const sueldoUnit = PLANTILLA_ROWS.find(r => {
+                    const sec = r['Sección'];
+                    const subsec = r['Subsección']?.trim();
+                    const key = subsec ? `${subsec} — ${r['Puesto'] || '(Sin puesto)'}` : r['Puesto'] || '(Sin puesto)';
+                    return sec === seccion && key === puesto;
+                  });
+                  const sueldoUnitVal = Number(sueldoUnit?.['Sueldo Mensual Bruto']) || 0;
+                  return (
+                    <TableRow key={`${seccion}-${puesto}`} className={j === 0 ? 'border-t-2 border-foreground/10' : ''}>
+                      <TableCell className={`font-medium ${j === 0 ? '' : 'text-transparent'}`}>
+                        {j === 0 ? seccion : ''}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{puesto}</TableCell>
+                      <TableCell className="text-right font-semibold">{count}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{fmtMXN(sueldoUnitVal)}</TableCell>
+                      <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmtMXN(sueldoUnitVal * count)}</TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+            <TableFooter>
+              <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
+                <TableCell colSpan={2}>TOTAL ({TOTAL_PERSONAL} empleados)</TableCell>
+                <TableCell className="text-right">{TOTAL_PERSONAL}</TableCell>
+                <TableCell />
+                <TableCell className="text-right">{fmtMXN(TOTAL_SUELDO_PLANTILLA)}</TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </div>
       </div>
     </div>
   );
