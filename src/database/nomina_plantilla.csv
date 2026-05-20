@@ -1,12 +1,12 @@
 ﻿ID,Sección,Subsección,Puesto,Sueldo Mensual Bruto,Tipo Pago
 001,Administración,,Gerente,24999.9,quincenal
-002,Administración,,Jefe de Área,15000,semanal
-003,Administración,,Jefe de Área,15000,semanal
-004,Administración,,Jefe de Área,15000,semanal
-005,Administración,,Jefe de Área,15000,semanal
-006,Administración,,Jefe de Área,15000,semanal
-007,Administración,,Auxiliar Administrativo,9999.9,semanal
-008,Preparación,,Jefe de Área,15999.9,semanal
+002,Administración,,Citas,15000,semanal
+003,Administración,,Material de Empaque,15000,semanal
+004,Administración,,Auxiliar Administrativo,9999.9,semanal
+005,Preparación,,Jefe de Área,15999.9,semanal
+006,Preparación,,Operativo de Preparación,8499.9,semanal
+007,Preparación,,Operativo de Preparación,8499.9,semanal
+008,Preparación,,Operativo de Preparación,8499.9,semanal
 009,Preparación,,Operativo de Preparación,8499.9,semanal
 010,Preparación,,Operativo de Preparación,8499.9,semanal
 011,Preparación,,Operativo de Preparación,8499.9,semanal
@@ -19,12 +19,12 @@
 018,Preparación,,Operativo de Preparación,8499.9,semanal
 019,Preparación,,Operativo de Preparación,8499.9,semanal
 020,Preparación,,Operativo de Preparación,8499.9,semanal
-021,Preparación,,Operativo de Preparación,8499.9,semanal
-022,Preparación,,Operativo de Preparación,8499.9,semanal
-023,Almacén,,Jefe de Área,15999.9,semanal
+021,Almacén,,Jefe de Área,15999.9,semanal
+022,Almacén,CUBO,Operativo,9000,semanal
+023,Almacén,CUBO,Operativo,9000,semanal
 024,Almacén,CUBO,Operativo,9000,semanal
-025,Almacén,CUBO,Operativo,9000,semanal
-026,Almacén,CUBO,Operativo,9000,semanal
+025,Almacén,Surtido,Operativo,8499.9,semanal
+026,Almacén,Surtido,Operativo,8499.9,semanal
 027,Almacén,Surtido,Operativo,8499.9,semanal
 028,Almacén,Surtido,Operativo,8499.9,semanal
 029,Almacén,Surtido,Operativo,8499.9,semanal
@@ -32,10 +32,8 @@
 031,Almacén,Surtido,Operativo,8499.9,semanal
 032,Almacén,Surtido,Operativo,8499.9,semanal
 033,Almacén,Surtido,Operativo,8499.9,semanal
-034,Almacén,Surtido,Operativo,8499.9,semanal
-035,Almacén,Surtido,Operativo,8499.9,semanal
-036,Embarques,,Jefe de Área,15999.9,semanal
+034,Embarques,,Jefe de Área,15999.9,semanal
+035,Embarques,,Operativo de Embarque,9000,semanal
+036,Embarques,,Operativo de Embarque,9000,semanal
 037,Embarques,,Operativo de Embarque,9000,semanal
-038,Embarques,,Operativo de Embarque,9000,semanal
-039,Embarques,,Operativo de Embarque,9000,semanal
 TOTAL,,,,407497.2,

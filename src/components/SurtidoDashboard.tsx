@@ -23,6 +23,7 @@ import { ALL_ROWS as VENTAS_ROWS } from '../hooks/useSalesData';
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr'];
 const COLORS = ['#1e2a5e', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+const SECCION = 'Almacén';
 
 function parseCSV(raw: string): Record<string, string>[] {
   const lines = raw.trim().split('\n').filter(l => l.trim());
@@ -90,13 +91,13 @@ const RESUMEN: ResumenRow[] = parseCSV(nominaResumenRaw)
     personas: Number(r['Personas']) || 0,
   }));
 
-export default function AdministracionDashboard() {
+export default function SurtidoDashboard() {
   const [mesFilter, setMesFilter] = useState<string>('todos');
   const [puestoFilter, setPuestoFilter] = useState<string>('todos');
   const [search, setSearch] = useState<string>('');
 
   const puestos = useMemo(() =>
-    Array.from(new Set(DETALLE.filter(r => r.seccion === 'Administración').map(r => r.puesto))).sort(),
+    Array.from(new Set(DETALLE.filter(r => r.seccion === SECCION).map(r => r.puesto))).sort(),
     [],
   );
 
@@ -106,10 +107,10 @@ export default function AdministracionDashboard() {
     setSearch('');
   }
 
-  const adminDetalle = useMemo(() => {
+  const surtidoDetalle = useMemo(() => {
     const s = search.toLowerCase();
     return DETALLE.filter(r => {
-      if (r.seccion !== 'Administración') return false;
+      if (r.seccion !== SECCION) return false;
       if (mesFilter !== 'todos' && r.mes !== mesFilter) return false;
       if (puestoFilter !== 'todos' && r.puesto !== puestoFilter) return false;
       if (s && ![r.puesto, r.id, r.periodo].join(' ').toLowerCase().includes(s)) return false;
@@ -117,27 +118,28 @@ export default function AdministracionDashboard() {
     });
   }, [mesFilter, puestoFilter, search]);
 
-  const adminPlantilla = useMemo(() =>
-    PLANTILLA.filter(r => r.seccion === 'Administración'),
-    []);
+  const surtidoPlantilla = useMemo(() =>
+    PLANTILLA.filter(r => r.seccion === SECCION),
+    [],
+  );
 
-  const adminResumen = RESUMEN.find(r => r.seccion === 'Administración');
+  const surtidoResumen = RESUMEN.find(r => r.seccion === SECCION);
 
   const totalNomina = useMemo(() =>
-    adminDetalle.reduce((s, r) => s + r.pagoPeriodo, 0),
-    [adminDetalle],
+    surtidoDetalle.reduce((s, r) => s + r.pagoPeriodo, 0),
+    [surtidoDetalle],
   );
 
   const totalHoras = useMemo(() =>
-    adminDetalle.reduce((s, r) => s + r.horas, 0),
-    [adminDetalle],
+    surtidoDetalle.reduce((s, r) => s + r.horas, 0),
+    [surtidoDetalle],
   );
 
   const costoPorHora = totalHoras > 0 ? totalNomina / totalHoras : 0;
 
   const byPuesto = useMemo(() => {
     const map: Record<string, { total: number; horas: number; personas: Set<string> }> = {};
-    adminDetalle.forEach(r => {
+    surtidoDetalle.forEach(r => {
       if (!map[r.puesto]) map[r.puesto] = { total: 0, horas: 0, personas: new Set() };
       map[r.puesto].total += r.pagoPeriodo;
       map[r.puesto].horas += r.horas;
@@ -150,7 +152,7 @@ export default function AdministracionDashboard() {
       personas: v.personas.size,
       costoPorHora: v.horas > 0 ? v.total / v.horas : 0,
     })).sort((a, b) => b.total - a.total);
-  }, [adminDetalle]);
+  }, [surtidoDetalle]);
 
   const pesoKgPorMes = useMemo(() =>
     Object.fromEntries(
@@ -166,7 +168,7 @@ export default function AdministracionDashboard() {
 
   const byMes = useMemo(() =>
     MESES.map(m => {
-      const nomina = DETALLE.filter(r => r.seccion === 'Administración' && r.mes === m)
+      const nomina = DETALLE.filter(r => r.seccion === SECCION && r.mes === m)
         .reduce((s, r) => s + r.pagoPeriodo, 0);
       const kg = pesoKgPorMes[m] ?? 0;
       return { mes: m, total: nomina, kg, cuota: kg > 0 ? nomina / kg : 0 };
@@ -176,19 +178,19 @@ export default function AdministracionDashboard() {
 
   const cuotaTotal = totalPesoKg > 0 ? totalNomina / totalPesoKg : 0;
 
+  const surtidoNominaTotal = useMemo(() =>
+    DETALLE.filter(r => r.seccion === SECCION).reduce((s, r) => s + r.pagoPeriodo, 0),
+    [],
+  );
+
   const resumenSecciones = useMemo(() =>
     RESUMEN.map(r => ({ seccion: r.seccion, total: r.total, personas: r.personas })),
     [],
   );
 
-  const pag = usePagination(adminDetalle, 50);
+  const pag = usePagination(surtidoDetalle, 50);
 
-  const adminNominaTotal = useMemo(() =>
-    DETALLE.filter(r => r.seccion === 'Administración').reduce((s, r) => s + r.pagoPeriodo, 0),
-    [],
-  );
-
-  const byClienteAdmin = useMemo<{ cliente: string; ventas: number; peso: number; nomina: number; cuota: number }[]>(() => {
+  const byClienteSurtido = useMemo<{ cliente: string; ventas: number; peso: number; nomina: number; cuota: number }[]>(() => {
     const map: Record<string, { ventas: number; peso: number }> = {};
     VENTAS_ROWS.forEach(r => {
       if (!map[r.nombre_cliente]) map[r.nombre_cliente] = { ventas: 0, peso: 0 };
@@ -200,24 +202,24 @@ export default function AdministracionDashboard() {
         cliente,
         ventas: v.ventas,
         peso: v.peso,
-        nomina: totalPesoKg > 0 ? (v.peso / totalPesoKg) * adminNominaTotal : 0,
-        cuota: totalPesoKg > 0 ? adminNominaTotal / totalPesoKg : 0,
+        nomina: totalPesoKg > 0 ? (v.peso / totalPesoKg) * surtidoNominaTotal : 0,
+        cuota: totalPesoKg > 0 ? surtidoNominaTotal / totalPesoKg : 0,
       }))
       .sort((a, b) => b.nomina - a.nomina);
-  }, [adminNominaTotal]);
+  }, [surtidoNominaTotal]);
 
-  const cuotaClientePag = usePagination(byClienteAdmin, 25);
+  const cuotaClientePag = usePagination(byClienteSurtido, 25);
 
-  const detalleLineasAdmin = useMemo(() =>
+  const detalleLineasSurtido = useMemo(() =>
     VENTAS_ROWS.map(r => ({
       ...r,
-      montoAdmin: totalPesoKg > 0 ? (r.peso_std / totalPesoKg) * adminNominaTotal : 0,
-      cuotaAdmin: totalPesoKg > 0 ? adminNominaTotal / totalPesoKg : 0,
+      montoSurtido: totalPesoKg > 0 ? (r.peso_std / totalPesoKg) * surtidoNominaTotal : 0,
+      cuotaSurtido: totalPesoKg > 0 ? surtidoNominaTotal / totalPesoKg : 0,
     })),
-    [adminNominaTotal],
+    [surtidoNominaTotal],
   );
 
-  const detalleLineasPag = usePagination(detalleLineasAdmin, 50);
+  const detalleLineasPag = usePagination(detalleLineasSurtido, 50);
 
   const hayFiltros = mesFilter !== 'todos' || puestoFilter !== 'todos' || search !== '';
 
@@ -259,7 +261,7 @@ export default function AdministracionDashboard() {
           </Button>
         )}
         <span className="text-xs text-muted-foreground ml-auto">
-          {adminDetalle.length} registros
+          {surtidoDetalle.length} registros
         </span>
       </div>
 
@@ -277,7 +279,7 @@ export default function AdministracionDashboard() {
         <Card className="border-0 shadow-sm ring-1 ring-foreground/10">
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Personal Activo</div>
-            <div className="text-xl font-bold text-[#1e2a5e]">{adminPlantilla.length}</div>
+            <div className="text-xl font-bold text-[#1e2a5e]">{surtidoPlantilla.length}</div>
             <div className="text-xs text-muted-foreground mt-1">empleados en plantilla</div>
           </CardContent>
         </Card>
@@ -297,9 +299,9 @@ export default function AdministracionDashboard() {
         </Card>
         <Card className="border-0 shadow-sm ring-1 ring-foreground/10">
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cuota Admin ($/kg)</div>
-            <div className="text-xl font-bold text-amber-600">{fmtMXN(cuotaTotal)}</div>
-            <div className="text-xs text-muted-foreground mt-1">nómina admin / kg vendidos</div>
+            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cuota Surtido ($/kg)</div>
+            <div className="text-xl font-bold text-teal-600">{fmtMXN(cuotaTotal)}</div>
+            <div className="text-xs text-muted-foreground mt-1">nómina surtido / kg vendidos</div>
           </CardContent>
         </Card>
       </div>
@@ -312,8 +314,8 @@ export default function AdministracionDashboard() {
             key={m}
             onClick={() => setMesFilter(m)}
             className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${mesFilter === m
-              ? 'bg-[#1e2a5e] text-white'
-              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                ? 'bg-[#1e2a5e] text-white'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
               }`}
           >
             {m === 'todos' ? 'Todos' : m}
@@ -354,7 +356,7 @@ export default function AdministracionDashboard() {
                       <TableCell className="text-right">{r.personas}</TableCell>
                       <TableCell className="text-right">{r.horas.toLocaleString('es-MX')}</TableCell>
                       <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmtMXN(r.total)}</TableCell>
-                      <TableCell className="text-right font-semibold text-amber-600">
+                      <TableCell className="text-right font-semibold text-teal-600">
                         {totalPesoKg > 0 ? fmtMXN(r.total / totalPesoKg) : '—'}
                       </TableCell>
                       <TableCell className="text-right">{fmtMXN(r.costoPorHora)}</TableCell>
@@ -366,11 +368,11 @@ export default function AdministracionDashboard() {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
-                    <TableCell>TOTAL Administración</TableCell>
-                    <TableCell className="text-right">{adminPlantilla.length}</TableCell>
+                    <TableCell>TOTAL Surtido</TableCell>
+                    <TableCell className="text-right">{surtidoPlantilla.length}</TableCell>
                     <TableCell className="text-right">{totalHoras.toLocaleString('es-MX')}</TableCell>
                     <TableCell className="text-right">{fmtMXN(totalNomina)}</TableCell>
-                    <TableCell className="text-right font-semibold text-amber-300">{fmtMXN(cuotaTotal)}</TableCell>
+                    <TableCell className="text-right font-semibold text-teal-300">{fmtMXN(cuotaTotal)}</TableCell>
                     <TableCell className="text-right">{fmtMXN(costoPorHora)}</TableCell>
                     <TableCell className="text-right">100%</TableCell>
                   </TableRow>
@@ -394,7 +396,7 @@ export default function AdministracionDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {adminPlantilla.map((r, i) => (
+                  {surtidoPlantilla.map((r, i) => (
                     <TableRow key={i}>
                       <TableCell className="font-mono text-xs">{r.id}</TableCell>
                       <TableCell className="font-medium">{r.puesto}</TableCell>
@@ -407,9 +409,9 @@ export default function AdministracionDashboard() {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
-                    <TableCell colSpan={2}>TOTAL ({adminPlantilla.length} empleados)</TableCell>
+                    <TableCell colSpan={2}>TOTAL ({surtidoPlantilla.length} empleados)</TableCell>
                     <TableCell className="text-right">
-                      {fmtMXN(adminPlantilla.reduce((s, r) => s + r.sueldoMensual, 0))}
+                      {fmtMXN(surtidoPlantilla.reduce((s, r) => s + r.sueldoMensual, 0))}
                     </TableCell>
                     <TableCell />
                   </TableRow>
@@ -430,8 +432,8 @@ export default function AdministracionDashboard() {
                     <TableHead className="text-white font-semibold text-right">Ventas</TableHead>
                     <TableHead className="text-white font-semibold text-right">Peso (kg)</TableHead>
                     <TableHead className="text-white font-semibold text-right">% kg s/Total</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Cuota Admin ($/kg)</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Monto Admin Asignado</TableHead>
+                    <TableHead className="text-white font-semibold text-right">Cuota Surtido ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right">Monto Surtido Asignado</TableHead>
                     <TableHead className="text-white font-semibold text-right">% s/Ventas</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -444,7 +446,7 @@ export default function AdministracionDashboard() {
                       <TableCell className="text-right text-muted-foreground">
                         {totalPesoKg > 0 ? ((r.peso / totalPesoKg) * 100).toFixed(2) : '—'}%
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-amber-600">
+                      <TableCell className="text-right font-semibold text-teal-600">
                         {fmtMXN(r.cuota)}
                       </TableCell>
                       <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmtMXN(r.nomina)}</TableCell>
@@ -456,15 +458,15 @@ export default function AdministracionDashboard() {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
-                    <TableCell>TOTAL ({byClienteAdmin.length} clientes)</TableCell>
-                    <TableCell className="text-right">{fmtMXN(byClienteAdmin.reduce((s, r) => s + r.ventas, 0))}</TableCell>
+                    <TableCell>TOTAL ({byClienteSurtido.length} clientes)</TableCell>
+                    <TableCell className="text-right">{fmtMXN(byClienteSurtido.reduce((s, r) => s + r.ventas, 0))}</TableCell>
                     <TableCell className="text-right">{totalPesoKg.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-right">100%</TableCell>
-                    <TableCell className="text-right text-amber-300">{fmtMXN(cuotaTotal)}</TableCell>
-                    <TableCell className="text-right">{fmtMXN(adminNominaTotal)}</TableCell>
+                    <TableCell className="text-right text-teal-300">{fmtMXN(cuotaTotal)}</TableCell>
+                    <TableCell className="text-right">{fmtMXN(surtidoNominaTotal)}</TableCell>
                     <TableCell className="text-right">
-                      {byClienteAdmin.reduce((s, r) => s + r.ventas, 0) > 0
-                        ? ((adminNominaTotal / byClienteAdmin.reduce((s, r) => s + r.ventas, 0)) * 100).toFixed(2)
+                      {byClienteSurtido.reduce((s, r) => s + r.ventas, 0) > 0
+                        ? ((surtidoNominaTotal / byClienteSurtido.reduce((s, r) => s + r.ventas, 0)) * 100).toFixed(2)
                         : '—'}%
                     </TableCell>
                   </TableRow>
@@ -474,7 +476,7 @@ export default function AdministracionDashboard() {
             <TablePagination
               page={cuotaClientePag.page}
               totalPages={cuotaClientePag.totalPages}
-              totalItems={byClienteAdmin.length}
+              totalItems={byClienteSurtido.length}
               pageSize={cuotaClientePag.pageSize}
               onPageChange={cuotaClientePag.setPage}
             />
@@ -495,8 +497,8 @@ export default function AdministracionDashboard() {
                     <TableHead className="text-white font-semibold text-center">Mes</TableHead>
                     <TableHead className="text-white font-semibold text-right">Importe Venta</TableHead>
                     <TableHead className="text-white font-semibold text-right">Peso (kg)</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Cuota Admin ($/kg)</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Monto Admin</TableHead>
+                    <TableHead className="text-white font-semibold text-right">Cuota Surtido ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right">Monto Surtido</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -511,10 +513,10 @@ export default function AdministracionDashboard() {
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">{fmtMXN(r.importe)}</TableCell>
                       <TableCell className="text-right">{r.peso_std.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
-                      <TableCell className="text-right font-semibold text-amber-600">
-                        {r.cuotaAdmin > 0 ? `$${r.cuotaAdmin.toFixed(4)}` : '—'}
+                      <TableCell className="text-right font-semibold text-teal-600">
+                        {r.cuotaSurtido > 0 ? `$${r.cuotaSurtido.toFixed(4)}` : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmtMXN(r.montoAdmin)}</TableCell>
+                      <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmtMXN(r.montoSurtido)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -523,8 +525,8 @@ export default function AdministracionDashboard() {
                     <TableCell colSpan={5}>TOTAL ({VENTAS_ROWS.length} registros)</TableCell>
                     <TableCell className="text-right">{fmtMXN(VENTAS_ROWS.reduce((s, r) => s + r.importe, 0))}</TableCell>
                     <TableCell className="text-right">{totalPesoKg.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
-                    <TableCell className="text-right text-amber-300">${cuotaTotal.toFixed(4)}</TableCell>
-                    <TableCell className="text-right">{fmtMXN(adminNominaTotal)}</TableCell>
+                    <TableCell className="text-right text-teal-300">${cuotaTotal.toFixed(4)}</TableCell>
+                    <TableCell className="text-right">{fmtMXN(surtidoNominaTotal)}</TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>
@@ -578,7 +580,7 @@ export default function AdministracionDashboard() {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
-                    <TableCell colSpan={5}>TOTAL ({adminDetalle.length} registros)</TableCell>
+                    <TableCell colSpan={5}>TOTAL ({surtidoDetalle.length} registros)</TableCell>
                     <TableCell className="text-right">{totalHoras.toLocaleString('es-MX')}</TableCell>
                     <TableCell />
                     <TableCell className="text-right">{fmtMXN(totalNomina)}</TableCell>
@@ -590,7 +592,7 @@ export default function AdministracionDashboard() {
             <TablePagination
               page={pag.page}
               totalPages={pag.totalPages}
-              totalItems={adminDetalle.length}
+              totalItems={surtidoDetalle.length}
               pageSize={pag.pageSize}
               onPageChange={pag.setPage}
             />
@@ -603,7 +605,7 @@ export default function AdministracionDashboard() {
         {/* Nómina por mes */}
         <Card className="border-0 shadow-sm ring-1 ring-foreground/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-foreground">Nómina Administración por Mes</CardTitle>
+            <CardTitle className="text-sm font-semibold text-foreground">Nómina Surtido por Mes</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
@@ -612,7 +614,7 @@ export default function AdministracionDashboard() {
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
                 <Tooltip formatter={(v: number) => fmtMXN(v)} />
-                <Bar dataKey="total" name="Nómina" fill="#1e2a5e" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="total" name="Nómina" fill="#0d9488" radius={[4, 4, 0, 0]}>
                   <LabelList dataKey="total" position="top" formatter={(v: number) => `$${(v / 1000).toFixed(1)}k`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
@@ -620,10 +622,10 @@ export default function AdministracionDashboard() {
           </CardContent>
         </Card>
 
-        {/* Cuota Admin $/kg por mes */}
+        {/* Cuota Surtido $/kg por mes */}
         <Card className="border-0 shadow-sm ring-1 ring-foreground/10">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold text-foreground">Cuota Admin ($/kg) por Mes</CardTitle>
+            <CardTitle className="text-sm font-semibold text-foreground">Cuota Surtido ($/kg) por Mes</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
@@ -632,7 +634,7 @@ export default function AdministracionDashboard() {
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${v.toFixed(2)}`} />
                 <Tooltip formatter={(v: number) => `$${v.toFixed(4)}`} />
-                <Bar dataKey="cuota" name="$/kg" fill="#f59e0b" radius={[4, 4, 0, 0]}>
+                <Bar dataKey="cuota" name="$/kg" fill="#14b8a6" radius={[4, 4, 0, 0]}>
                   <LabelList dataKey="cuota" position="top" formatter={(v: number) => `$${v.toFixed(2)}`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
@@ -712,7 +714,7 @@ export default function AdministracionDashboard() {
       </div>
 
       {/* Resumen global de secciones */}
-      {adminResumen && (
+      {surtidoResumen && (
         <Card className="border-0 shadow-sm ring-1 ring-foreground/10">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold">Resumen Nómina — Todas las Secciones</CardTitle>
@@ -733,11 +735,11 @@ export default function AdministracionDashboard() {
               </TableHeader>
               <TableBody>
                 {RESUMEN.map((r, i) => (
-                  <TableRow key={i} className={r.seccion === 'Administración' ? 'bg-blue-50' : ''}>
-                    <TableCell className={`font-medium ${r.seccion === 'Administración' ? 'text-[#1e2a5e] font-bold' : ''}`}>
+                  <TableRow key={i} className={r.seccion === SECCION ? 'bg-teal-50' : ''}>
+                    <TableCell className={`font-medium ${r.seccion === SECCION ? 'text-teal-700 font-bold' : ''}`}>
                       {r.seccion}
-                      {r.seccion === 'Administración' && (
-                        <Badge className="ml-2 bg-[#1e2a5e] text-white text-xs">Esta sección</Badge>
+                      {r.seccion === SECCION && (
+                        <Badge className="ml-2 bg-teal-700 text-white text-xs">Esta sección</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">{r.personas}</TableCell>

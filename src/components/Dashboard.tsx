@@ -8,6 +8,7 @@ import CostTable from './CostTable';
 import FletesDashboard from './FletesDashboard';
 import MaterialEmpaqueDashboard from './MaterialEmpaqueDashboard';
 import AdministracionDashboard from './AdministracionDashboard';
+import SurtidoDashboard from './SurtidoDashboard';
 import ResumenDashboard from './ResumenDashboard';
 
 type CostTab = 'resumen' | 'administracion' | 'surtido' | 'preparacion' | 'embarque' | 'me' | 'fletes';
@@ -59,11 +60,15 @@ export default function Dashboard({ title, soloData, engomadoData: _engomadoData
           <AdministracionDashboard />
         </TabsContent>
 
+        <TabsContent value="surtido" forceMount className="data-[state=inactive]:hidden">
+          <SurtidoDashboard />
+        </TabsContent>
+
         <TabsContent value="resumen" forceMount className="data-[state=inactive]:hidden">
           <ResumenDashboard />
         </TabsContent>
 
-        {COST_TABS.filter(t => !['fletes', 'me', 'administracion', 'resumen'].includes(t.value)).map(({ value }) => (
+        {COST_TABS.filter(t => !['fletes', 'me', 'administracion', 'resumen', 'surtido'].includes(t.value)).map(({ value }) => (
           <TabsContent key={value} value={value} forceMount className="data-[state=inactive]:hidden">
             <div className="text-lg font-bold text-foreground mb-4">
               {title} — {value.charAt(0).toUpperCase() + value.slice(1)}

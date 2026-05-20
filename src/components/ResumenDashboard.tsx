@@ -72,7 +72,6 @@ const TOTAL_PESO = ALL_ROWS.reduce((s, r) => s + r.peso_std, 0);
 const TOTAL_VENTAS = ALL_ROWS.reduce((s, r) => s + r.importe, 0);
 const TOTAL_ME = ALL_ROWS.reduce((s, r) => s + r.monto_me, 0);
 const TOTAL_FLETE = ALL_ROWS.reduce((s, r) => s + r.monto_fle, 0);
-const TOTAL_MYO = ALL_ROWS.reduce((s, r) => s + r.monto_myo, 0);
 
 const CUOTA_ADMIN = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Administración'] ?? 0) / TOTAL_PESO : 0;
 const CUOTA_PREP = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Preparación'] ?? 0) / TOTAL_PESO : 0;
@@ -145,12 +144,12 @@ export default function ResumenDashboard() {
           </CardContent>
         </Card>
         {[
+          { label: 'Cuota Administración', val: CUOTA_ADMIN, total: NOMINA_TOTALES['Administración'] ?? 0, color: 'text-amber-600' },
+          { label: 'Cuota Surtido', val: CUOTA_ALM, total: NOMINA_TOTALES['Almacén'] ?? 0, color: 'text-teal-600' },
+          { label: 'Cuota Preparación', val: CUOTA_PREP, total: NOMINA_TOTALES['Preparación'] ?? 0, color: 'text-emerald-600' },
+          { label: 'Cuota Embarques', val: CUOTA_EMB, total: NOMINA_TOTALES['Embarques'] ?? 0, color: 'text-purple-600' },
           { label: 'Cuota ME', val: TOTAL_PESO > 0 ? TOTAL_ME / TOTAL_PESO : 0, total: TOTAL_ME, color: 'text-blue-600' },
           { label: 'Cuota Flete', val: TOTAL_PESO > 0 ? TOTAL_FLETE / TOTAL_PESO : 0, total: TOTAL_FLETE, color: 'text-indigo-600' },
-          { label: 'Cuota Maniobras', val: TOTAL_PESO > 0 ? TOTAL_MYO / TOTAL_PESO : 0, total: TOTAL_MYO, color: 'text-orange-500' },
-          { label: 'Cuota Administración', val: CUOTA_ADMIN, total: NOMINA_TOTALES['Administración'] ?? 0, color: 'text-amber-600' },
-          { label: 'Cuota Preparación', val: CUOTA_PREP, total: NOMINA_TOTALES['Preparación'] ?? 0, color: 'text-emerald-600' },
-          { label: 'Cuota Almacén / Embarques', val: CUOTA_ALM + CUOTA_EMB, total: (NOMINA_TOTALES['Almacén'] ?? 0) + (NOMINA_TOTALES['Embarques'] ?? 0), color: 'text-purple-600' },
         ].map(({ label, val, total, color }) => (
           <Card key={label} className="border-0 shadow-sm ring-1 ring-foreground/10">
             <CardContent className="p-4">
@@ -167,21 +166,19 @@ export default function ResumenDashboard() {
         <div className="flex items-center gap-2 bg-white ring-1 ring-foreground/10 rounded-lg p-1 shadow-xs">
           <button
             onClick={() => handleViewMode('cliente')}
-            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'cliente'
-                ? 'bg-[#1e2a5e] text-white'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'cliente'
+              ? 'bg-[#1e2a5e] text-white'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Por Cliente
           </button>
           <button
             onClick={() => handleViewMode('articulo')}
-            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'articulo'
-                ? 'bg-[#1e2a5e] text-white'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
+            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === 'articulo'
+              ? 'bg-[#1e2a5e] text-white'
+              : 'text-muted-foreground hover:text-foreground'
+              }`}
           >
             Por Artículo
           </button>
@@ -229,26 +226,23 @@ export default function ResumenDashboard() {
                   Ventas <SortIcon k="ventas" />
                 </TableHead>
                 <TableHead className="text-white font-semibold text-right whitespace-nowrap text-xs py-2">Kg (Peso STD)</TableHead>
-                <TableHead className={`${thC} bg-blue-900/50`} onClick={() => toggleSort('cuotaMe')}>
-                  Cuota ME ($/kg) <SortIcon k="cuotaMe" />
-                </TableHead>
-                <TableHead className={`${thC} bg-indigo-900/50`} onClick={() => toggleSort('cuotaFlete')}>
-                  Cuota Flete ($/kg) <SortIcon k="cuotaFlete" />
-                </TableHead>
-                <TableHead className={`${thC} bg-orange-900/50`} onClick={() => toggleSort('cuotaManiobras')}>
-                  Cuota Maniobras ($/kg) <SortIcon k="cuotaManiobras" />
-                </TableHead>
                 <TableHead className="text-white font-semibold text-right bg-amber-900/50 whitespace-nowrap text-xs py-2">
                   Cuota Admin ($/kg)
+                </TableHead>
+                <TableHead className="text-white font-semibold text-right bg-teal-900/50 whitespace-nowrap text-xs py-2">
+                  Cuota Surtido ($/kg)
                 </TableHead>
                 <TableHead className="text-white font-semibold text-right bg-emerald-900/50 whitespace-nowrap text-xs py-2">
                   Cuota Preparación ($/kg)
                 </TableHead>
                 <TableHead className="text-white font-semibold text-right bg-purple-900/50 whitespace-nowrap text-xs py-2">
-                  Cuota Almacén ($/kg)
-                </TableHead>
-                <TableHead className="text-white font-semibold text-right bg-purple-900/50 whitespace-nowrap text-xs py-2">
                   Cuota Embarques ($/kg)
+                </TableHead>
+                <TableHead className={`${thC} bg-blue-900/50`} onClick={() => toggleSort('cuotaMe')}>
+                  Cuota ME ($/kg) <SortIcon k="cuotaMe" />
+                </TableHead>
+                <TableHead className={`${thC} bg-indigo-900/50`} onClick={() => toggleSort('cuotaFlete')}>
+                  Cuota Flete ($/kg) <SortIcon k="cuotaFlete" />
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -260,19 +254,16 @@ export default function ResumenDashboard() {
                   <TableCell className={`${tdC} text-right text-muted-foreground`}>
                     {r.peso.toLocaleString('es-MX', { maximumFractionDigits: 0 })}
                   </TableCell>
+                  <TableCell className={`${tdC} text-right font-semibold text-amber-600`}>{fmt2(CUOTA_ADMIN)}</TableCell>
+                  <TableCell className={`${tdC} text-right font-semibold text-teal-600`}>{fmt2(CUOTA_ALM)}</TableCell>
+                  <TableCell className={`${tdC} text-right font-semibold text-emerald-600`}>{fmt2(CUOTA_PREP)}</TableCell>
+                  <TableCell className={`${tdC} text-right font-semibold text-purple-600`}>{fmt2(CUOTA_EMB)}</TableCell>
                   <TableCell className={`${tdC} text-right font-semibold text-blue-700`}>
                     {r.cuotaMe > 0 ? fmt2(r.cuotaMe) : '—'}
                   </TableCell>
                   <TableCell className={`${tdC} text-right font-semibold text-indigo-700`}>
                     {r.cuotaFlete > 0 ? fmt2(r.cuotaFlete) : '—'}
                   </TableCell>
-                  <TableCell className={`${tdC} text-right font-semibold text-orange-600`}>
-                    {r.cuotaManiobras > 0 ? fmt2(r.cuotaManiobras) : '—'}
-                  </TableCell>
-                  <TableCell className={`${tdC} text-right font-semibold text-amber-600`}>{fmt2(CUOTA_ADMIN)}</TableCell>
-                  <TableCell className={`${tdC} text-right font-semibold text-emerald-600`}>{fmt2(CUOTA_PREP)}</TableCell>
-                  <TableCell className={`${tdC} text-right font-semibold text-purple-600`}>{fmt2(CUOTA_ALM)}</TableCell>
-                  <TableCell className={`${tdC} text-right font-semibold text-purple-600`}>{fmt2(CUOTA_EMB)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -283,13 +274,12 @@ export default function ResumenDashboard() {
                 <TableCell className="text-right">
                   {data.reduce((s, r) => s + r.peso, 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}
                 </TableCell>
+                <TableCell className="text-right">{fmt2(CUOTA_ADMIN)}</TableCell>
+                <TableCell className="text-right">{fmt2(CUOTA_ALM)}</TableCell>
+                <TableCell className="text-right">{fmt2(CUOTA_PREP)}</TableCell>
+                <TableCell className="text-right">{fmt2(CUOTA_EMB)}</TableCell>
                 <TableCell className="text-right">{fmt2(TOTAL_PESO > 0 ? TOTAL_ME / TOTAL_PESO : 0)}</TableCell>
                 <TableCell className="text-right">{fmt2(TOTAL_PESO > 0 ? TOTAL_FLETE / TOTAL_PESO : 0)}</TableCell>
-                <TableCell className="text-right">{fmt2(TOTAL_PESO > 0 ? TOTAL_MYO / TOTAL_PESO : 0)}</TableCell>
-                <TableCell className="text-right">{fmt2(CUOTA_ADMIN)}</TableCell>
-                <TableCell className="text-right">{fmt2(CUOTA_PREP)}</TableCell>
-                <TableCell className="text-right">{fmt2(CUOTA_ALM)}</TableCell>
-                <TableCell className="text-right">{fmt2(CUOTA_EMB)}</TableCell>
               </TableRow>
             </TableFooter>
           </Table>
