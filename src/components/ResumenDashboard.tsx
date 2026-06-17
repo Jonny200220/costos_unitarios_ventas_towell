@@ -10,25 +10,11 @@ import { Search } from 'lucide-react';
 import { ALL_ROWS } from '../hooks/useSalesData';
 import { usePagination } from '../hooks/usePagination';
 import TablePagination from './TablePagination';
-import nominaResumenRaw from '../database/nomina_resumen_seccion_mes.csv?raw';
-import nominaPlantillaRaw from '../database/nomina_plantilla.csv?raw';
+import { fmtMXN } from '../lib/format';
+import { getResumen, getPlantilla } from '../services/nominaService';
 
 function fmt2(n: number) {
   return `$${n.toFixed(2)}`;
-}
-
-function fmtMXN(n: number) {
-  return `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function parseNominaResumen(raw: string): Record<string, number> {
-  const lines = raw.trim().split('\n').filter(l => l.trim());
-  const result: Record<string, number> = {};
-  lines.slice(1).forEach(line => {
-    const cols = line.split(',').map(c => c.trim());
-    result[cols[0]] = Number(cols[5]) || 0;
-  });
-  return result;
 }
 
 type ItemResumen = {
@@ -40,30 +26,21 @@ type ItemResumen = {
   cuotaManiobras: number;
 };
 
-const NOMINA_TOTALES = parseNominaResumen(nominaResumenRaw);
+const NOMINA_TOTALES: Record<string, number> = Object.fromEntries(
+  getResumen().map(r => [r.seccion, r.total])
+);
 
-function parsePlantilla(raw: string) {
-  const lines = raw.trim().split('\n').filter(l => l.trim());
-  const headers = lines[0].split(',').map(h => h.trim());
-  return lines.slice(1)
-    .map(line => {
-      const cols = line.split(',').map(c => c.trim());
-      return Object.fromEntries(headers.map((h, i) => [h, cols[i] ?? '']));
-    })
-    .filter(r => r['ID'] && r['ID'] !== 'ID' && r['ID'] !== 'TOTAL');
-}
-
-const PLANTILLA_ROWS = parsePlantilla(nominaPlantillaRaw);
+const PLANTILLA_ROWS = getPlantilla();
 
 const PERSONAL_POR_SECCION = (() => {
   const map: Record<string, { puestos: Record<string, number>; total: number; sueldoTotal: number }> = {};
   PLANTILLA_ROWS.forEach(r => {
-    const sec = r['Sección'];
-    const subsec = r['Subsección']?.trim();
+    const sec = r.seccion;
+    const subsec = r.subseccion?.trim();
     const puesto = subsec
-      ? `${subsec} — ${r['Puesto'] || '(Sin puesto)'}`
-      : r['Puesto'] || '(Sin puesto)';
-    const sueldo = Number(r['Sueldo Mensual Bruto']) || 0;
+      ? `${subsec} — ${r.puesto || '(Sin puesto)'}`
+      : r.puesto || '(Sin puesto)';
+    const sueldo = r.sueldoMensual;
     if (!map[sec]) map[sec] = { puestos: {}, total: 0, sueldoTotal: 0 };
     map[sec].puestos[puesto] = (map[sec].puestos[puesto] || 0) + 1;
     map[sec].total += 1;
@@ -73,7 +50,7 @@ const PERSONAL_POR_SECCION = (() => {
 })();
 
 const TOTAL_PERSONAL = PLANTILLA_ROWS.length;
-const TOTAL_SUELDO_PLANTILLA = PLANTILLA_ROWS.reduce((s, r) => s + (Number(r['Sueldo Mensual Bruto']) || 0), 0);
+const TOTAL_SUELDO_PLANTILLA = PLANTILLA_ROWS.reduce((s, r) => s + r.sueldoMensual, 0);
 
 
 function buildRowsFiltered(key: 'nombre_cliente' | 'nombre_articulo', tamano: string): ItemResumen[] {
@@ -344,12 +321,11 @@ export default function ResumenDashboard() {
               {Object.entries(PERSONAL_POR_SECCION).map(([seccion, data]) =>
                 Object.entries(data.puestos).map(([puesto, count], j) => {
                   const sueldoUnit = PLANTILLA_ROWS.find(r => {
-                    const sec = r['Sección'];
-                    const subsec = r['Subsección']?.trim();
-                    const key = subsec ? `${subsec} — ${r['Puesto'] || '(Sin puesto)'}` : r['Puesto'] || '(Sin puesto)';
-                    return sec === seccion && key === puesto;
+                    const subsec = r.subseccion?.trim();
+                    const key = subsec ? `${subsec} — ${r.puesto || '(Sin puesto)'}` : r.puesto || '(Sin puesto)';
+                    return r.seccion === seccion && key === puesto;
                   });
-                  const sueldoUnitVal = Number(sueldoUnit?.['Sueldo Mensual Bruto']) || 0;
+                  const sueldoUnitVal = sueldoUnit?.sueldoMensual ?? 0;
                   return (
                     <TableRow key={`${seccion}-${puesto}`} className={j === 0 ? 'border-t-2 border-foreground/10' : ''}>
                       <TableCell className={`font-medium ${j === 0 ? '' : 'text-transparent'}`}>

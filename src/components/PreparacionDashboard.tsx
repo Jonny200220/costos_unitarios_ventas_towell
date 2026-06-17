@@ -16,80 +16,17 @@ import {
 } from 'recharts';
 import TablePagination from './TablePagination';
 import { usePagination } from '../hooks/usePagination';
-import nominaDetalleRaw from '../database/nomina_detalle.csv?raw';
-import nominaPlantillaRaw from '../database/nomina_plantilla.csv?raw';
-import nominaResumenRaw from '../database/nomina_resumen_seccion_mes.csv?raw';
 import { ALL_ROWS as VENTAS_ROWS } from '../hooks/useSalesData';
+import { fmtMXN } from '../lib/format';
+import { getNominaDetalle, getPlantilla, getResumen } from '../services/nominaService';
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr'];
 const COLORS = ['#1e2a5e', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 const SECCION = 'Preparación';
 
-function parseCSV(raw: string): Record<string, string>[] {
-  const lines = raw.trim().split('\n').filter(l => l.trim());
-  const headers = lines[0].split(',').map(h => h.trim());
-  return lines.slice(1).map(line => {
-    const cols = line.split(',').map(c => c.trim());
-    return Object.fromEntries(headers.map((h, i) => [h, cols[i] ?? '']));
-  });
-}
-
-function fmtMXN(n: number) {
-  return `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-type DetalleRow = {
-  id: string; seccion: string; puesto: string; mes: string;
-  periodo: string; dias: number; horas: number;
-  sueldoDiario: number; pagoPeriodo: number; tipoPago: string;
-};
-
-type PlantillaRow = {
-  id: string; seccion: string; puesto: string;
-  sueldoMensual: number; tipoPago: string;
-};
-
-type ResumenRow = {
-  seccion: string; ene: number; feb: number; mar: number;
-  abr: number; total: number; personas: number;
-};
-
-const DETALLE: DetalleRow[] = parseCSV(nominaDetalleRaw)
-  .filter(r => r['ID'] && r['ID'] !== 'ID')
-  .map(r => ({
-    id: r['ID'],
-    seccion: r['Sección'],
-    puesto: r['Puesto'],
-    mes: r['Mes'],
-    periodo: r['Periodo'],
-    dias: Number(r['Días Lab.']) || 0,
-    horas: Number(r['Horas']) || 0,
-    sueldoDiario: Number(r['Sueldo Diario']) || 0,
-    pagoPeriodo: Number(r['Pago Periodo']) || 0,
-    tipoPago: r['Tipo Pago'],
-  }));
-
-const PLANTILLA: PlantillaRow[] = parseCSV(nominaPlantillaRaw)
-  .filter(r => r['ID'] && r['ID'] !== 'ID' && r['ID'] !== 'TOTAL')
-  .map(r => ({
-    id: r['ID'],
-    seccion: r['Sección'],
-    puesto: r['Puesto'],
-    sueldoMensual: Number(r['Sueldo Mensual Bruto']) || 0,
-    tipoPago: r['Tipo Pago'],
-  }));
-
-const RESUMEN: ResumenRow[] = parseCSV(nominaResumenRaw)
-  .filter(r => r['Sección'] && r['Sección'] !== 'Sección' && r['Sección'] !== 'TOTAL')
-  .map(r => ({
-    seccion: r['Sección'],
-    ene: Number(r['Enero']) || 0,
-    feb: Number(r['Febrero']) || 0,
-    mar: Number(r['Marzo']) || 0,
-    abr: Number(r['Abril']) || 0,
-    total: Number(r['Total']) || 0,
-    personas: Number(r['Personas']) || 0,
-  }));
+const DETALLE = getNominaDetalle();
+const PLANTILLA = getPlantilla();
+const RESUMEN = getResumen();
 
 export default function PreparacionDashboard() {
   const [mesFilter, setMesFilter] = useState<string>('todos');

@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 
-export type MainTab = 'historicos' | 'comparador' | 'pt';
+export type MainTab = 'historicos' | 'comparador' | 'pt' | 'configuracion';
 
 interface HeaderProps {
   activeTab: MainTab;
@@ -20,11 +20,12 @@ export default function Header({ activeTab, onTabChange }: HeaderProps) {
       </div>
 
       <nav className="flex items-center gap-1">
-        {(['historicos', 'comparador', 'pt'] as MainTab[]).map((tab) => {
+        {(['historicos', 'comparador', 'pt', 'configuracion'] as MainTab[]).map((tab) => {
           const labels: Record<MainTab, string> = {
             historicos: 'Históricos',
             comparador: 'Comparador',
             pt: 'PT',
+            configuracion: 'Configuración',
           };
           return (
             <Button

@@ -15,10 +15,7 @@ import SalesFilterSidebar from './SalesFilterSidebar';
 import TablePagination from './TablePagination';
 import { useSalesData } from '../hooks/useSalesData';
 import { usePagination } from '../hooks/usePagination';
-
-function fmt(n: number) {
-  return `$${n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+import { fmtMXN as fmt } from '../lib/format';
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr'];
 

@@ -4,6 +4,7 @@ import Header, { type MainTab } from './components/Header';
 import Dashboard from './components/Dashboard';
 import Comparador from './components/Comparador';
 import Historicos from './components/Historicos';
+import ConfiguracionPage from './features/configuracion/ConfiguracionPage';
 import {
   FLETES_SOLO_URDIDO,
   FLETES_URDIDO_ENGOMADO,
@@ -29,6 +30,7 @@ function App() {
             engomadoData={FLETES_URDIDO_ENGOMADO}
           />
         )}
+        {mainTab === 'configuracion' && <ConfiguracionPage />}
       </main>
     </div>
   );
