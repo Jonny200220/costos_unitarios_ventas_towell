@@ -134,6 +134,7 @@ export default function AdministracionDashboard() {
   );
 
   const costoPorHora = totalHoras > 0 ? totalNomina / totalHoras : 0;
+  const costoPorMinuto = costoPorHora / 60;
 
   const byPuesto = useMemo(() => {
     const map: Record<string, { total: number; horas: number; personas: Set<string> }> = {};
@@ -264,7 +265,7 @@ export default function AdministracionDashboard() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card className="border-0 shadow-sm ring-1 ring-foreground/10">
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Nómina Periodo</div>
@@ -293,6 +294,13 @@ export default function AdministracionDashboard() {
             <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Costo/Hora</div>
             <div className="text-xl font-bold text-green-600">{fmtMXN(costoPorHora)}</div>
             <div className="text-xs text-muted-foreground mt-1">costo unitario por hora</div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm ring-1 ring-foreground/10">
+          <CardContent className="p-4">
+            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Costo/Minuto</div>
+            <div className="text-xl font-bold text-emerald-600">{fmtMXN(costoPorMinuto)}</div>
+            <div className="text-xs text-muted-foreground mt-1">costo unitario por minuto</div>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-sm ring-1 ring-foreground/10">
