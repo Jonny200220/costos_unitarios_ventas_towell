@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNominaData } from '../hooks/useNominaData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -18,17 +19,13 @@ import TablePagination from './TablePagination';
 import { usePagination } from '../hooks/usePagination';
 import { ALL_ROWS as VENTAS_ROWS } from '../hooks/useSalesData';
 import { fmtMXN } from '../lib/format';
-import { getNominaDetalle, getPlantilla, getResumen } from '../services/nominaService';
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr'];
 const COLORS = ['#1e2a5e', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 const SECCION = 'Preparación';
 
-const DETALLE = getNominaDetalle();
-const PLANTILLA = getPlantilla();
-const RESUMEN = getResumen();
-
 export default function PreparacionDashboard() {
+  const { detalle: DETALLE, plantilla: PLANTILLA, resumen: RESUMEN, loading } = useNominaData();
   const [mesFilter, setMesFilter] = useState<string>('todos');
   const [puestoFilter, setPuestoFilter] = useState<string>('todos');
   const [search, setSearch] = useState<string>('');
@@ -167,6 +164,8 @@ export default function PreparacionDashboard() {
   const detalleLineasPag = usePagination(detalleLineasPrep, 50);
 
   const hayFiltros = mesFilter !== 'todos' || puestoFilter !== 'todos' || search !== '';
+
+  if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando datos...</div>;
 
   return (
     <div className="space-y-6">

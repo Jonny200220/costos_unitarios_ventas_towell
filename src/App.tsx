@@ -2,8 +2,6 @@ import { useState } from 'react';
 import './index.css';
 import Header, { type MainTab } from './components/Header';
 import Dashboard from './components/Dashboard';
-import Comparador from './components/Comparador';
-import Historicos from './components/Historicos';
 import ConfiguracionPage from './features/configuracion/ConfiguracionPage';
 import {
   FLETES_SOLO_URDIDO,
@@ -21,8 +19,6 @@ function App() {
       />
 
       <main className="flex-1">
-        {mainTab === 'historicos' && <Historicos />}
-        {mainTab === 'comparador' && <Comparador />}
         {mainTab === 'pt' && (
           <Dashboard
             title="Costos Unitarios"

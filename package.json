@@ -7,10 +7,17 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "seed": "dotenv -e .env -- tsx supabase/seeds/seed_all.ts",
+    "seed:plantilla": "dotenv -e .env -- tsx supabase/seeds/seed_plantilla.ts",
+    "seed:nomina": "dotenv -e .env -- tsx supabase/seeds/seed_nomina_detalle.ts",
+    "seed:ventas": "dotenv -e .env -- tsx supabase/seeds/seed_ventas.ts",
+    "seed:fletes": "dotenv -e .env -- tsx supabase/seeds/seed_fletes.ts",
+    "seed:me": "dotenv -e .env -- tsx supabase/seeds/seed_material_empaque.ts"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.2.8",
+    "@supabase/supabase-js": "^2.108.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.16.0",
@@ -36,6 +43,8 @@
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "tsx": "^4.20.3",
+    "dotenv-cli": "^8.0.0"
   }
 }

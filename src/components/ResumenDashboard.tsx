@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNominaData } from '../hooks/useNominaData';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Table, TableBody, TableCell, TableFooter,
@@ -11,7 +12,6 @@ import { ALL_ROWS } from '../hooks/useSalesData';
 import { usePagination } from '../hooks/usePagination';
 import TablePagination from './TablePagination';
 import { fmtMXN } from '../lib/format';
-import { getResumen, getPlantilla } from '../services/nominaService';
 
 function fmt2(n: number) {
   return `$${n.toFixed(2)}`;
@@ -26,31 +26,6 @@ type ItemResumen = {
   cuotaManiobras: number;
 };
 
-const NOMINA_TOTALES: Record<string, number> = Object.fromEntries(
-  getResumen().map(r => [r.seccion, r.total])
-);
-
-const PLANTILLA_ROWS = getPlantilla();
-
-const PERSONAL_POR_SECCION = (() => {
-  const map: Record<string, { puestos: Record<string, number>; total: number; sueldoTotal: number }> = {};
-  PLANTILLA_ROWS.forEach(r => {
-    const sec = r.seccion;
-    const subsec = r.subseccion?.trim();
-    const puesto = subsec
-      ? `${subsec} — ${r.puesto || '(Sin puesto)'}`
-      : r.puesto || '(Sin puesto)';
-    const sueldo = r.sueldoMensual;
-    if (!map[sec]) map[sec] = { puestos: {}, total: 0, sueldoTotal: 0 };
-    map[sec].puestos[puesto] = (map[sec].puestos[puesto] || 0) + 1;
-    map[sec].total += 1;
-    map[sec].sueldoTotal += sueldo;
-  });
-  return map;
-})();
-
-const TOTAL_PERSONAL = PLANTILLA_ROWS.length;
-const TOTAL_SUELDO_PLANTILLA = PLANTILLA_ROWS.reduce((s, r) => s + r.sueldoMensual, 0);
 
 
 function buildRowsFiltered(key: 'nombre_cliente' | 'nombre_articulo', tamano: string): ItemResumen[] {
@@ -84,14 +59,41 @@ const TOTAL_VENTAS = ALL_ROWS.reduce((s, r) => s + r.importe, 0);
 const TOTAL_ME = ALL_ROWS.reduce((s, r) => s + r.monto_me, 0);
 const TOTAL_FLETE = ALL_ROWS.reduce((s, r) => s + r.monto_fle, 0);
 
-const CUOTA_ADMIN = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Administración'] ?? 0) / TOTAL_PESO : 0;
-const CUOTA_PREP = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Preparación'] ?? 0) / TOTAL_PESO : 0;
-const CUOTA_ALM = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Almacén'] ?? 0) / TOTAL_PESO : 0;
-const CUOTA_EMB = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Embarques'] ?? 0) / TOTAL_PESO : 0;
-
 type SortKey = 'label' | 'ventas' | 'cuotaMe' | 'cuotaFlete' | 'cuotaManiobras';
 
 export default function ResumenDashboard() {
+  const { resumen, plantilla: PLANTILLA_ROWS, loading } = useNominaData();
+
+  const NOMINA_TOTALES = useMemo(
+    () => Object.fromEntries(resumen.map(r => [r.seccion, r.total])),
+    [resumen],
+  );
+
+  const PERSONAL_POR_SECCION = useMemo(() => {
+    const map: Record<string, { puestos: Record<string, number>; total: number; sueldoTotal: number }> = {};
+    PLANTILLA_ROWS.forEach(r => {
+      const sec = r.seccion;
+      const subsec = r.subseccion?.trim();
+      const puesto = subsec ? `${subsec} — ${r.puesto || '(Sin puesto)'}` : r.puesto || '(Sin puesto)';
+      if (!map[sec]) map[sec] = { puestos: {}, total: 0, sueldoTotal: 0 };
+      map[sec].puestos[puesto] = (map[sec].puestos[puesto] || 0) + 1;
+      map[sec].total += 1;
+      map[sec].sueldoTotal += r.sueldoMensual;
+    });
+    return map;
+  }, [PLANTILLA_ROWS]);
+
+  const TOTAL_PERSONAL = PLANTILLA_ROWS.length;
+  const TOTAL_SUELDO_PLANTILLA = useMemo(
+    () => PLANTILLA_ROWS.reduce((s, r) => s + r.sueldoMensual, 0),
+    [PLANTILLA_ROWS],
+  );
+
+  const CUOTA_ADMIN = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Administración'] ?? 0) / TOTAL_PESO : 0;
+  const CUOTA_PREP  = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Preparación'] ?? 0) / TOTAL_PESO : 0;
+  const CUOTA_ALM   = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Almacén'] ?? 0) / TOTAL_PESO : 0;
+  const CUOTA_EMB   = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Embarques'] ?? 0) / TOTAL_PESO : 0;
+
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('ventas');
   const [sortAsc, setSortAsc] = useState(false);
@@ -139,6 +141,8 @@ export default function ResumenDashboard() {
 
   const pag = usePagination(data, 15);
   const colLabel = viewMode === 'cliente' ? 'Cliente' : 'Artículo';
+
+  if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando datos...</div>;
 
   const thC = 'text-white font-semibold text-right cursor-pointer select-none hover:opacity-80 whitespace-nowrap text-xs py-2';
   const tdC = 'py-1 text-xs';
