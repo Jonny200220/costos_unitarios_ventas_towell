@@ -21,8 +21,22 @@ const BATCH_SIZE = 1000;
 const csvPath = resolve(__dirname, '../../src/database/base_ventas_ene_abr_26.csv');
 const raw = readFileSync(csvPath, 'utf-8');
 
+// Split respetando comillas: el CSV trae campos como "GRUPO PARISINA, S.A. DE C.V."
+function splitFields(line: string): string[] {
+  const cols: string[] = [];
+  let cur = '';
+  let inQ = false;
+  for (const ch of line) {
+    if (ch === '"') inQ = !inQ;
+    else if (ch === ',' && !inQ) { cols.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  cols.push(cur);
+  return cols.map(c => c.trim().replace(/^"|"$/g, ''));
+}
+
 const lines = raw.trim().split('\n').filter(l => l.trim());
-const headers = lines[0].split(',').map(h => h.trim());
+const headers = splitFields(lines[0]);
 
 function idx(name: string) {
   const i = headers.indexOf(name);
@@ -52,9 +66,16 @@ const iMontoMyo = idx('monto_myo');
 const dataLines = lines.slice(1);
 console.log(`Cargando ${dataLines.length} registros de ventas en batches de ${BATCH_SIZE}...`);
 
+// Idempotente: limpia la tabla antes de insertar para evitar duplicados en re-corridas
+const { error: delError } = await supabase.from('ventas').delete().gte('id', 0);
+if (delError) {
+  console.error('Error al limpiar ventas previas:', delError.message);
+  process.exit(1);
+}
+
 for (let i = 0; i < dataLines.length; i += BATCH_SIZE) {
   const batch = dataLines.slice(i, i + BATCH_SIZE).map(line => {
-    const c = line.split(',').map(col => col.trim().replace(/^"|"$/g, ''));
+    const c = splitFields(line);
     return {
       fecha: c[iFecha] || null,
       mes: c[iMes],

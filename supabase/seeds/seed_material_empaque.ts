@@ -15,11 +15,25 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY!,
 );
 
+// Split respetando comillas: el CSV trae campos con comas dentro de comillas
+function splitFields(line: string): string[] {
+  const cols: string[] = [];
+  let cur = '';
+  let inQ = false;
+  for (const ch of line) {
+    if (ch === '"') inQ = !inQ;
+    else if (ch === ',' && !inQ) { cols.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  cols.push(cur);
+  return cols.map(c => c.trim().replace(/^"|"$/g, ''));
+}
+
 function parseCSV(raw: string): Record<string, string>[] {
   const lines = raw.trim().split('\n').filter(l => l.trim());
-  const headers = lines[0].split(',').map(h => h.trim());
+  const headers = splitFields(lines[0]);
   return lines.slice(1).map(line => {
-    const cols = line.split(',').map(c => c.trim());
+    const cols = splitFields(line);
     return Object.fromEntries(headers.map((h, i) => [h, cols[i] ?? '']));
   });
 }
@@ -47,6 +61,13 @@ const records = rows.map(r => ({
 }));
 
 console.log(`Cargando ${records.length} registros de material de empaque en batches de ${BATCH_SIZE}...`);
+
+// Idempotente: limpia la tabla antes de insertar para evitar duplicados en re-corridas
+const { error: delError } = await supabase.from('material_empaque_detalle').delete().gte('folio', 0);
+if (delError) {
+  console.error('Error al limpiar material de empaque previo:', delError.message);
+  process.exit(1);
+}
 
 for (let i = 0; i < records.length; i += BATCH_SIZE) {
   const batch = records.slice(i, i + BATCH_SIZE);

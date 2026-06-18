@@ -27,10 +27,12 @@ function parseCSV(raw: string): Record<string, string>[] {
 
 const ANIO = 2026;
 const BATCH_SIZE = 500;
+const MESES_VALIDOS = new Set(['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']);
 
 const csvPath = resolve(__dirname, '../../src/database/nomina_detalle.csv');
 const raw = readFileSync(csvPath, 'utf-8');
-const rows = parseCSV(raw).filter(r => r['ID'] && r['ID'] !== 'ID');
+// Excluye encabezados y filas resumen/separadoras que traen el mes vacío (violarían chk_mes)
+const rows = parseCSV(raw).filter(r => r['ID'] && r['ID'] !== 'ID' && MESES_VALIDOS.has(r['Mes']?.trim()));
 
 const records = rows.map(r => ({
   empleado_id: r['ID'],
@@ -51,6 +53,13 @@ const records = rows.map(r => ({
 }));
 
 console.log(`Cargando ${records.length} registros de nómina detalle en batches de ${BATCH_SIZE}...`);
+
+// Idempotente: limpia el año antes de insertar para evitar duplicados en re-corridas
+const { error: delError } = await supabase.from('nomina_detalle').delete().eq('anio', ANIO);
+if (delError) {
+  console.error('Error al limpiar nómina detalle previa:', delError.message);
+  process.exit(1);
+}
 
 for (let i = 0; i < records.length; i += BATCH_SIZE) {
   const batch = records.slice(i, i + BATCH_SIZE);

@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "PowerShell(pnpm seed:plantilla)",
-      "PowerShell(pnpm exec tsc -b 2>&1)"
+      "PowerShell(pnpm exec tsc -b 2>&1)",
+      "PowerShell(pnpm dotenv -e .env -- tsx supabase/seeds/_diag.ts)",
+      "PowerShell(pnpm seed)",
+      "PowerShell($v = \\(supabase --version 2>&1\\); \"version: $v\"; Test-Path supabase/.temp/linked-project.json | ForEach-Object { \"linked: $_\" }; supabase db push --help 2>&1 | Select-String -Pattern \"yes|password|dry-run\" | Select-Object -First 6)",
+      "PowerShell(supabase db push --yes 2>&1)",
+      "PowerShell(supabase migration list 2>&1)",
+      "PowerShell(supabase migration repair --status reverted 20260618 2>&1)"
     ]
   },
   "enableAllProjectMcpServers": true,

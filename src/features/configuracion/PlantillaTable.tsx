@@ -34,14 +34,7 @@ export default function PlantillaTable({ seccion }: Props) {
 
   return (
     <div className="space-y-4">
-      {/* Banner de aviso */}
-      {/* <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
-        <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-        <span>
-          Los cambios en esta plantilla afectarán los cálculos de costos unitarios en los dashboards.
-          Asegúrate de guardar antes de salir.
-        </span>
-      </div> */}
+
 
       {/* Banner de error */}
       {error && (
