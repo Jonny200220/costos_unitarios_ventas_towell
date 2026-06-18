@@ -32,7 +32,7 @@ export default function PreparacionDashboard() {
 
   const puestos = useMemo(() =>
     Array.from(new Set(DETALLE.filter(r => r.seccion === SECCION).map(r => r.puesto))).sort(),
-    [],
+    [DETALLE],
   );
 
   function resetFiltros() {
@@ -50,11 +50,11 @@ export default function PreparacionDashboard() {
       if (s && ![r.puesto, r.id, r.periodo].join(' ').toLowerCase().includes(s)) return false;
       return true;
     });
-  }, [mesFilter, puestoFilter, search]);
+  }, [DETALLE, mesFilter, puestoFilter, search]);
 
   const prepPlantilla = useMemo(() =>
     PLANTILLA.filter(r => r.seccion === SECCION),
-    [],
+    [PLANTILLA],
   );
 
   const prepResumen = RESUMEN.find(r => r.seccion === SECCION);
@@ -115,19 +115,19 @@ export default function PreparacionDashboard() {
       const kg = pesoKgPorMes[m] ?? 0;
       return { mes: m, total: nomina, kg, cuota: kg > 0 ? nomina / kg : 0 };
     }),
-    [pesoKgPorMes],
+    [pesoKgPorMes, DETALLE],
   );
 
   const cuotaTotal = totalPesoKg > 0 ? totalNomina / totalPesoKg : 0;
 
   const prepNominaTotal = useMemo(() =>
     DETALLE.filter(r => r.seccion === SECCION).reduce((s, r) => s + r.pagoPeriodo, 0),
-    [],
+    [DETALLE],
   );
 
   const resumenSecciones = useMemo(() =>
     RESUMEN.map(r => ({ seccion: r.seccion, total: r.total, personas: r.personas })),
-    [],
+    [RESUMEN],
   );
 
   const pag = usePagination(prepDetalle, 50);

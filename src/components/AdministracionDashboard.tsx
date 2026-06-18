@@ -31,7 +31,7 @@ export default function AdministracionDashboard() {
 
   const puestos = useMemo(() =>
     Array.from(new Set(DETALLE.filter(r => r.seccion === 'Administración').map(r => r.puesto))).sort(),
-    [],
+    [DETALLE],
   );
 
   function resetFiltros() {
@@ -49,11 +49,11 @@ export default function AdministracionDashboard() {
       if (s && ![r.puesto, r.id, r.periodo].join(' ').toLowerCase().includes(s)) return false;
       return true;
     });
-  }, [mesFilter, puestoFilter, search]);
+  }, [DETALLE, mesFilter, puestoFilter, search]);
 
   const adminPlantilla = useMemo(() =>
     PLANTILLA.filter(r => r.seccion === 'Administración'),
-    []);
+    [PLANTILLA]);
 
   const adminResumen = RESUMEN.find(r => r.seccion === 'Administración');
 
@@ -106,21 +106,21 @@ export default function AdministracionDashboard() {
       const kg = pesoKgPorMes[m] ?? 0;
       return { mes: m, total: nomina, kg, cuota: kg > 0 ? nomina / kg : 0 };
     }),
-    [pesoKgPorMes],
+    [pesoKgPorMes, DETALLE],
   );
 
   const cuotaTotal = totalPesoKg > 0 ? totalNomina / totalPesoKg : 0;
 
   const resumenSecciones = useMemo(() =>
     RESUMEN.map(r => ({ seccion: r.seccion, total: r.total, personas: r.personas })),
-    [],
+    [RESUMEN],
   );
 
   const pag = usePagination(adminDetalle, 50);
 
   const adminNominaTotal = useMemo(() =>
     DETALLE.filter(r => r.seccion === 'Administración').reduce((s, r) => s + r.pagoPeriodo, 0),
-    [],
+    [DETALLE],
   );
 
   const byClienteAdmin = useMemo<{ cliente: string; ventas: number; peso: number; nomina: number; cuota: number }[]>(() => {
