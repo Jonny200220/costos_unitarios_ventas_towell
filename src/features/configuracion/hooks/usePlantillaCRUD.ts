@@ -1,30 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { PlantillaRow, Seccion } from '../../../types/nomina';
-import { getPlantilla } from '../../../services/nominaService';
+import { getPlantillaAsync, upsertPlantilla, deletePlantilla } from '../../../services/nominaService';
 
 export type PlantillaEditRow = PlantillaRow & { _dirty?: boolean; _new?: boolean };
-
-const STORAGE_KEY = 'plantilla_overrides_v1';
-
-function loadFromStorage(seccion: Seccion): PlantillaEditRow[] | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const all = JSON.parse(raw) as Record<string, PlantillaEditRow[]>;
-    return all[seccion] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function saveToStorage(seccion: Seccion, rows: PlantillaEditRow[]) {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const all = raw ? (JSON.parse(raw) as Record<string, PlantillaEditRow[]>) : {};
-    all[seccion] = rows.map(r => ({ ...r, _dirty: false, _new: false }));
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
-  } catch { /* ignore */ }
-}
 
 function nextId(rows: PlantillaEditRow[]): string {
   const nums = rows.map(r => Number(r.id)).filter(n => !isNaN(n));
@@ -33,22 +11,31 @@ function nextId(rows: PlantillaEditRow[]): string {
 }
 
 export function usePlantillaCRUD(seccion: Seccion) {
-  const [rows, setRows] = useState<PlantillaEditRow[]>(() => {
-    const stored = loadFromStorage(seccion);
-    if (stored) return stored;
-    return getPlantilla(seccion).map(r => ({ ...r, _dirty: false, _new: false }));
-  });
+  const [rows, setRows] = useState<PlantillaEditRow[]>([]);
+  const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [isDirty, setIsDirty] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await getPlantillaAsync(seccion);
+      setRows(data.map(r => ({ ...r, _dirty: false, _new: false })));
+      setDeletedIds([]);
+      setIsDirty(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al cargar la plantilla');
+    } finally {
+      setLoading(false);
+    }
+  }, [seccion]);
 
   useEffect(() => {
-    const stored = loadFromStorage(seccion);
-    if (stored) {
-      setRows(stored);
-    } else {
-      setRows(getPlantilla(seccion).map(r => ({ ...r, _dirty: false, _new: false })));
-    }
-    setIsDirty(false);
-  }, [seccion]);
+    reload();
+  }, [reload]);
 
   const update = useCallback((id: string, field: keyof PlantillaRow, value: string | number) => {
     setRows(prev => prev.map(r =>
@@ -75,26 +62,37 @@ export function usePlantillaCRUD(seccion: Seccion) {
   }, [seccion]);
 
   const remove = useCallback((id: string) => {
-    setRows(prev => prev.filter(r => r.id !== id));
+    setRows(prev => {
+      const row = prev.find(r => r.id === id);
+      // Solo registramos para borrar en Supabase las filas que ya existían (no las nuevas sin guardar)
+      if (row && !row._new) {
+        setDeletedIds(d => (d.includes(id) ? d : [...d, id]));
+      }
+      return prev.filter(r => r.id !== id);
+    });
     setIsDirty(true);
   }, []);
 
-  const save = useCallback(() => {
-    saveToStorage(seccion, rows);
-    setRows(prev => prev.map(r => ({ ...r, _dirty: false, _new: false })));
-    setIsDirty(false);
-    // When Supabase is ready: await supabase.from('plantilla').upsert(rows)
-  }, [seccion, rows]);
+  const save = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const toUpsert = rows.filter(r => r._dirty || r._new);
+      await upsertPlantilla(toUpsert);
+      await deletePlantilla(deletedIds);
+      setRows(prev => prev.map(r => ({ ...r, _dirty: false, _new: false })));
+      setDeletedIds([]);
+      setIsDirty(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al guardar la plantilla');
+    } finally {
+      setSaving(false);
+    }
+  }, [rows, deletedIds]);
 
   const cancel = useCallback(() => {
-    const stored = loadFromStorage(seccion);
-    if (stored) {
-      setRows(stored);
-    } else {
-      setRows(getPlantilla(seccion).map(r => ({ ...r, _dirty: false, _new: false })));
-    }
-    setIsDirty(false);
-  }, [seccion]);
+    reload();
+  }, [reload]);
 
-  return { rows, isDirty, update, add, remove, save, cancel };
+  return { rows, isDirty, loading, saving, error, update, add, remove, save, cancel };
 }

@@ -106,6 +106,40 @@ export async function getPlantillaAsync(seccion?: Seccion): Promise<PlantillaRow
   }));
 }
 
+// Año fiscal de la plantilla (coincide con el default de la tabla y los seeds)
+const PLANTILLA_ANIO = 2026;
+
+export async function upsertPlantilla(rows: PlantillaRow[]): Promise<void> {
+  if (rows.length === 0) return;
+  const records = rows.map(r => ({
+    id: r.id,
+    anio: PLANTILLA_ANIO,
+    seccion: r.seccion,
+    subseccion: r.subseccion ?? '',
+    puesto: r.puesto,
+    sueldo_mensual: r.sueldoMensual,
+    tipo_pago: r.tipoPago,
+  }));
+
+  const { error } = await supabase
+    .from('plantilla')
+    .upsert(records, { onConflict: 'id,anio' });
+
+  if (error) throw new Error(error.message);
+}
+
+export async function deletePlantilla(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+
+  const { error } = await supabase
+    .from('plantilla')
+    .delete()
+    .eq('anio', PLANTILLA_ANIO)
+    .in('id', ids);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function getResumen(): Promise<ResumenRow[]> {
   const { data, error } = await supabase
     .from('nomina_detalle')

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Save, X, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Save, X, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +18,7 @@ interface Props {
 const TIPOS_PAGO = ['semanal', 'quincenal', 'mensual'];
 
 export default function PlantillaTable({ seccion }: Props) {
-  const { rows, isDirty, update, add, remove, save, cancel } = usePlantillaCRUD(seccion);
+  const { rows, isDirty, loading, saving, error, update, add, remove, save, cancel } = usePlantillaCRUD(seccion);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const totalSueldo = rows.reduce((s, r) => s + r.sueldoMensual, 0);
@@ -35,18 +35,31 @@ export default function PlantillaTable({ seccion }: Props) {
   return (
     <div className="space-y-4">
       {/* Banner de aviso */}
-      <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+      {/* <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
         <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
         <span>
           Los cambios en esta plantilla afectarán los cálculos de costos unitarios en los dashboards.
           Asegúrate de guardar antes de salir.
         </span>
-      </div>
+      </div> */}
+
+      {/* Banner de error */}
+      {error && (
+        <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>Error: {error}</span>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Button size="sm" onClick={add} className="h-8 gap-1 bg-[#1e2a5e] hover:bg-[#1e2a5e]/90">
+          <Button
+            size="sm"
+            onClick={add}
+            disabled={loading || saving}
+            className="h-8 gap-1 bg-[#1e2a5e] hover:bg-[#1e2a5e]/90"
+          >
             <Plus className="h-3.5 w-3.5" />
             Agregar empleado
           </Button>
@@ -61,7 +74,7 @@ export default function PlantillaTable({ seccion }: Props) {
             size="sm"
             variant="outline"
             onClick={cancel}
-            disabled={!isDirty}
+            disabled={!isDirty || saving}
             className="h-8 gap-1"
           >
             <X className="h-3.5 w-3.5" />
@@ -70,11 +83,11 @@ export default function PlantillaTable({ seccion }: Props) {
           <Button
             size="sm"
             onClick={save}
-            disabled={!isDirty}
+            disabled={!isDirty || saving}
             className="h-8 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
           >
-            <Save className="h-3.5 w-3.5" />
-            Guardar cambios
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {saving ? 'Guardando...' : 'Guardar cambios'}
           </Button>
         </div>
       </div>
@@ -159,7 +172,14 @@ export default function PlantillaTable({ seccion }: Props) {
               {rows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground text-sm">
-                    No hay empleados en esta sección. Agrega uno con el botón de arriba.
+                    {loading ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Cargando plantilla...
+                      </span>
+                    ) : (
+                      'No hay empleados en esta sección. Agrega uno con el botón de arriba.'
+                    )}
                   </TableCell>
                 </TableRow>
               )}

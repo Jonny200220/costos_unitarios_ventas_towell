@@ -1,6 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "PowerShell(pnpm seed:plantilla)",
+      "PowerShell(pnpm exec tsc -b 2>&1)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
   "enabledMcpjsonServers": [
     "shadcn"
-  ],
-  "enableAllProjectMcpServers": true
+  ]
 }
