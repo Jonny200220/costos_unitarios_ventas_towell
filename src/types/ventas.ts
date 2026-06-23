@@ -1,4 +1,5 @@
 export type SalesRow = {
+  orden_venta: string;
   fecha: string;
   mes: string;
   nombre_cliente: string;

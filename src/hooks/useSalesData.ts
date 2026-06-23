@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import baseVentasRaw from '../database/base_ventas_ene_abr_26.csv?raw';
 
 export type SalesRow = {
+  orden_venta: string;
   fecha: string;
   mes: string;
   nombre_cliente: string;
@@ -68,6 +69,7 @@ function parseRaw(raw: string): SalesRow[] {
     const n = (name: string) => { const v = g(name); return isNaN(Number(v)) ? 0 : Number(v); };
 
     return {
+      orden_venta: g('orden_venta'),
       fecha: g('fecha'),
       mes: g('mes'),
       nombre_cliente: g('nombre_cliente'),

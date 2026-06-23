@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Settings } from 'lucide-react';
 import PlantillaTable from './PlantillaTable';
+import PesosOCPage from '../pesos/PesosOCPage';
 import type { Seccion } from '../../types/nomina';
 
 const SECCIONES: { value: Seccion; label: string; color: string }[] = [
@@ -19,28 +20,40 @@ export default function ConfiguracionPage() {
           <Settings className="h-5 w-5 text-white" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-[#1e2a5e]">Configuración de Plantillas</h1>
+          <h1 className="text-xl font-bold text-[#1e2a5e]">Configuración</h1>
           <p className="text-sm text-muted-foreground">
-            Administra el personal por sección. Los cambios se reflejan en los cálculos de costos unitarios.
+            Administra la plantilla de personal y los pesos de esfuerzo por orden de venta.
           </p>
         </div>
       </div>
 
-      {/* Tabs por sección */}
-      <Tabs defaultValue="Administración">
+      <Tabs defaultValue="plantilla">
         <TabsList className="bg-white ring-1 ring-foreground/10 shadow-xs h-10 mb-6">
-          {SECCIONES.map(s => (
-            <TabsTrigger key={s.value} value={s.value} className="text-sm px-5">
-              {s.label}
-            </TabsTrigger>
-          ))}
+          <TabsTrigger value="plantilla" className="text-sm px-5">Plantilla</TabsTrigger>
+          <TabsTrigger value="pesos" className="text-sm px-5">Pesos por Orden</TabsTrigger>
         </TabsList>
 
-        {SECCIONES.map(s => (
-          <TabsContent key={s.value} value={s.value} className="mt-0">
-            <PlantillaTable seccion={s.value} />
-          </TabsContent>
-        ))}
+        {/* Sub-tabs de plantilla por sección */}
+        <TabsContent value="plantilla" className="mt-0">
+          <Tabs defaultValue="Administración">
+            <TabsList className="bg-white ring-1 ring-foreground/10 shadow-xs h-9 mb-5">
+              {SECCIONES.map(s => (
+                <TabsTrigger key={s.value} value={s.value} className="text-sm px-4">
+                  {s.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {SECCIONES.map(s => (
+              <TabsContent key={s.value} value={s.value} className="mt-0">
+                <PlantillaTable seccion={s.value} />
+              </TabsContent>
+            ))}
+          </Tabs>
+        </TabsContent>
+
+        <TabsContent value="pesos" className="mt-0">
+          <PesosOCPage />
+        </TabsContent>
       </Tabs>
     </div>
   );
