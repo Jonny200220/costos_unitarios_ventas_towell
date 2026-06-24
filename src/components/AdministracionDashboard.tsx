@@ -378,6 +378,7 @@ export default function AdministracionDashboard() {
                     <TableHead className="text-white font-semibold text-right">Nómina</TableHead>
                     <TableHead className="text-white font-semibold text-right">Cuota ($/kg)</TableHead>
                     <TableHead className="text-white font-semibold text-right">Costo/Hora</TableHead>
+                    <TableHead className="text-white font-semibold text-right">Cuota ($/min)</TableHead>
                     <TableHead className="text-white font-semibold text-right">% del Total</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -396,6 +397,9 @@ export default function AdministracionDashboard() {
                         {kgFiltrado > 0 ? fmtMXN(r.total / kgFiltrado) : '—'}
                       </TableCell>
                       <TableCell className="text-right">{fmtMXN(r.costoPorHora)}</TableCell>
+                      <TableCell className="text-right font-semibold text-amber-600">
+                        {r.horas > 0 ? `$${(r.costoPorHora / 60).toFixed(4)}` : '—'}
+                      </TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {totalNomina > 0 ? ((r.total / totalNomina) * 100).toFixed(1) : '0.0'}%
                       </TableCell>
@@ -411,6 +415,9 @@ export default function AdministracionDashboard() {
                     <TableCell className="text-right">{fmtMXN(totalNomina)}</TableCell>
                     <TableCell className="text-right font-semibold text-amber-300">{fmtMXN(cuotaTotal)}</TableCell>
                     <TableCell className="text-right">{fmtMXN(costoPorHora)}</TableCell>
+                    <TableCell className="text-right font-semibold text-amber-300">
+                      {totalHoras > 0 ? `$${costoPorMinuto.toFixed(4)}` : '—'}
+                    </TableCell>
                     <TableCell className="text-right">100%</TableCell>
                   </TableRow>
                 </TableFooter>
