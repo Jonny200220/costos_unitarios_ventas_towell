@@ -570,10 +570,10 @@ export default function PreparacionDashboard() {
               <BarChart data={byMes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => fmtMXN(v)} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${((v ?? 0) / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v: any) => fmtMXN(v ?? 0)} />
                 <Bar dataKey="total" name="Nómina" fill="#7c3aed" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="total" position="top" formatter={(v: number) => `$${(v / 1000).toFixed(1)}k`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="total" position="top" formatter={(v: any) => `$${((v ?? 0) / 1000).toFixed(1)}k`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -590,10 +590,10 @@ export default function PreparacionDashboard() {
               <BarChart data={byMes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${v.toFixed(2)}`} />
-                <Tooltip formatter={(v: number) => `$${v.toFixed(4)}`} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v ?? 0).toFixed(2)}`} />
+                <Tooltip formatter={(v: any) => `$${(v ?? 0).toFixed(4)}`} />
                 <Bar dataKey="cuota" name="$/kg" fill="#8b5cf6" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="cuota" position="top" formatter={(v: number) => `$${v.toFixed(2)}`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="cuota" position="top" formatter={(v: any) => `$${(v ?? 0).toFixed(2)}`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -624,7 +624,7 @@ export default function PreparacionDashboard() {
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => fmtMXN(v)} />
+                <Tooltip formatter={(v: any) => fmtMXN(v ?? 0)} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -639,11 +639,11 @@ export default function PreparacionDashboard() {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={byPuesto} layout="vertical" margin={{ top: 4, right: 40, left: 180, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => `$${v.toFixed(0)}`} />
+                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => `$${(v ?? 0).toFixed(0)}`} />
                 <YAxis dataKey="puesto" type="category" tick={{ fontSize: 11 }} width={175} />
-                <Tooltip formatter={(v: number) => fmtMXN(v)} />
+                <Tooltip formatter={(v: any) => fmtMXN(v ?? 0)} />
                 <Bar dataKey="costoPorHora" name="$/hora" fill="#7c3aed" radius={[0, 4, 4, 0]}>
-                  <LabelList dataKey="costoPorHora" position="right" formatter={(v: number) => `$${v.toFixed(2)}`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="costoPorHora" position="right" formatter={(v: any) => `$${(v ?? 0).toFixed(2)}`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -660,10 +660,10 @@ export default function PreparacionDashboard() {
               <BarChart data={resumenSecciones} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="seccion" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => fmtMXN(v)} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${((v ?? 0) / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v: any) => fmtMXN(v ?? 0)} />
                 <Bar dataKey="total" name="Nómina total" fill="#3b82f6" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="total" position="top" formatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="total" position="top" formatter={(v: any) => `$${((v ?? 0) / 1000).toFixed(0)}k`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

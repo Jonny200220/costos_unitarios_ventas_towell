@@ -1,4 +1,7 @@
 import { useMemo, useState } from 'react';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+} from '@/components/ui/dialog';
 import { useNominaData } from '../hooks/useNominaData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -28,6 +31,7 @@ export default function AdministracionDashboard() {
   const [mesFilter, setMesFilter] = useState<string>('todos');
   const [puestoFilter, setPuestoFilter] = useState<string>('todos');
   const [search, setSearch] = useState<string>('');
+  const [openDistribucion, setOpenDistribucion] = useState(false);
 
   const puestos = useMemo(() =>
     Array.from(new Set(DETALLE.filter(r => r.seccion === 'Administración').map(r => r.puesto))).sort(),
@@ -94,9 +98,14 @@ export default function AdministracionDashboard() {
     [],
   );
 
-  const totalPesoKg = useMemo(() =>
-    VENTAS_ROWS.reduce((s, r) => s + r.peso_std, 0),
-    [],
+  const ventasFiltradasPorMes = useMemo(() =>
+    mesFilter === 'todos' ? VENTAS_ROWS : VENTAS_ROWS.filter(r => r.mes === mesFilter),
+    [mesFilter],
+  );
+
+  const kgFiltrado = useMemo(() =>
+    ventasFiltradasPorMes.reduce((s, r) => s + r.peso_std, 0),
+    [ventasFiltradasPorMes],
   );
 
   const byMes = useMemo(() =>
@@ -109,7 +118,7 @@ export default function AdministracionDashboard() {
     [pesoKgPorMes, DETALLE],
   );
 
-  const cuotaTotal = totalPesoKg > 0 ? totalNomina / totalPesoKg : 0;
+  const cuotaTotal = kgFiltrado > 0 ? totalNomina / kgFiltrado : 0;
 
   const resumenSecciones = useMemo(() =>
     RESUMEN.map(r => ({ seccion: r.seccion, total: r.total, personas: r.personas })),
@@ -118,14 +127,11 @@ export default function AdministracionDashboard() {
 
   const pag = usePagination(adminDetalle, 50);
 
-  const adminNominaTotal = useMemo(() =>
-    DETALLE.filter(r => r.seccion === 'Administración').reduce((s, r) => s + r.pagoPeriodo, 0),
-    [DETALLE],
-  );
+  const adminNominaTotal = totalNomina;
 
   const byClienteAdmin = useMemo<{ cliente: string; ventas: number; peso: number; nomina: number; cuota: number }[]>(() => {
     const map: Record<string, { ventas: number; peso: number }> = {};
-    VENTAS_ROWS.forEach(r => {
+    ventasFiltradasPorMes.forEach(r => {
       if (!map[r.nombre_cliente]) map[r.nombre_cliente] = { ventas: 0, peso: 0 };
       map[r.nombre_cliente].ventas += r.importe;
       map[r.nombre_cliente].peso += r.peso_std;
@@ -135,21 +141,21 @@ export default function AdministracionDashboard() {
         cliente,
         ventas: v.ventas,
         peso: v.peso,
-        nomina: totalPesoKg > 0 ? (v.peso / totalPesoKg) * adminNominaTotal : 0,
-        cuota: totalPesoKg > 0 ? adminNominaTotal / totalPesoKg : 0,
+        nomina: kgFiltrado > 0 ? (v.peso / kgFiltrado) * adminNominaTotal : 0,
+        cuota: kgFiltrado > 0 ? adminNominaTotal / kgFiltrado : 0,
       }))
       .sort((a, b) => b.nomina - a.nomina);
-  }, [adminNominaTotal]);
+  }, [adminNominaTotal, ventasFiltradasPorMes, kgFiltrado]);
 
   const cuotaClientePag = usePagination(byClienteAdmin, 25);
 
   const detalleLineasAdmin = useMemo(() =>
-    VENTAS_ROWS.map(r => ({
+    ventasFiltradasPorMes.map(r => ({
       ...r,
-      montoAdmin: totalPesoKg > 0 ? (r.peso_std / totalPesoKg) * adminNominaTotal : 0,
-      cuotaAdmin: totalPesoKg > 0 ? adminNominaTotal / totalPesoKg : 0,
+      montoAdmin: kgFiltrado > 0 ? (r.peso_std / kgFiltrado) * adminNominaTotal : 0,
+      cuotaAdmin: kgFiltrado > 0 ? adminNominaTotal / kgFiltrado : 0,
     })),
-    [adminNominaTotal],
+    [adminNominaTotal, ventasFiltradasPorMes, kgFiltrado],
   );
 
   const detalleLineasPag = usePagination(detalleLineasAdmin, 50);
@@ -239,13 +245,68 @@ export default function AdministracionDashboard() {
             <div className="text-xs text-muted-foreground mt-1">costo unitario por minuto</div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm ring-1 ring-foreground/10">
-          <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cuota Admin ($/kg)</div>
-            <div className="text-xl font-bold text-amber-600">{fmtMXN(cuotaTotal)}</div>
-            <div className="text-xs text-muted-foreground mt-1">nómina admin / kg vendidos</div>
-          </CardContent>
-        </Card>
+        <Dialog open={openDistribucion} onOpenChange={setOpenDistribucion}>
+          <DialogTrigger asChild>
+            <Card className="border-0 shadow-sm ring-1 ring-foreground/10 cursor-pointer hover:ring-amber-400 hover:shadow-md transition-all">
+              <CardContent className="p-4">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cuota Admin ($/kg)</div>
+                <div className="text-xl font-bold text-amber-600">{fmtMXN(cuotaTotal)}</div>
+                <div className="text-xs text-amber-500 mt-1 font-medium">Ver distribución →</div>
+              </CardContent>
+            </Card>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl w-full">
+            <DialogHeader>
+              <DialogTitle className="text-base font-semibold text-foreground">
+                Distribución de Cuota Administrativa ($/kg) por Puesto
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  — {mesFilter === 'todos' ? 'Ene–Abr 2026' : mesFilter}
+                </span>
+              </DialogTitle>
+            </DialogHeader>
+            <div className="rounded-xl overflow-hidden ring-1 ring-foreground/10">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
+                    <TableHead className="text-white font-semibold">Puesto</TableHead>
+                    <TableHead className="text-white font-semibold text-right">Nómina</TableHead>
+                    <TableHead className="text-white font-semibold text-right">Cuota ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right">% de Cuota</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {byPuesto.map((p, i) => {
+                    const cuotaPuesto = kgFiltrado > 0 ? p.total / kgFiltrado : 0;
+                    const pct = cuotaTotal > 0 ? (cuotaPuesto / cuotaTotal) * 100 : 0;
+                    return (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{p.puesto}</TableCell>
+                        <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmtMXN(p.total)}</TableCell>
+                        <TableCell className="text-right font-semibold text-amber-600">${cuotaPuesto.toFixed(4)}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="w-20 h-2 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full bg-amber-400" style={{ width: `${Math.min(pct, 100)}%` }} />
+                            </div>
+                            <span className="text-sm text-muted-foreground w-12 text-right">{pct.toFixed(1)}%</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
+                    <TableCell>TOTAL</TableCell>
+                    <TableCell className="text-right">{fmtMXN(totalNomina)}</TableCell>
+                    <TableCell className="text-right text-amber-300">${cuotaTotal.toFixed(4)}</TableCell>
+                    <TableCell className="text-right">100%</TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Filtro mes */}
@@ -282,6 +343,8 @@ export default function AdministracionDashboard() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
+                    <TableHead className="text-white font-semibold">Sección</TableHead>
+                    <TableHead className="text-white font-semibold">Subsección</TableHead>
                     <TableHead className="text-white font-semibold">Puesto</TableHead>
                     <TableHead className="text-white font-semibold text-right">Personas</TableHead>
                     <TableHead className="text-white font-semibold text-right">Horas</TableHead>
@@ -292,25 +355,30 @@ export default function AdministracionDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {byPuesto.map((r, i) => (
+                  {byPuesto.map((r, i) => {
+                    const plantillaMatch = PLANTILLA.find(p => p.seccion === 'Administración' && p.puesto === r.puesto);
+                    return (
                     <TableRow key={i}>
+                      <TableCell className="font-medium text-[#1e2a5e]">{plantillaMatch?.seccion ?? 'Administración'}</TableCell>
+                      <TableCell className="text-muted-foreground">{plantillaMatch?.subseccion || '—'}</TableCell>
                       <TableCell className="font-medium">{r.puesto}</TableCell>
                       <TableCell className="text-right">{r.personas}</TableCell>
                       <TableCell className="text-right">{r.horas.toLocaleString('es-MX')}</TableCell>
                       <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmtMXN(r.total)}</TableCell>
                       <TableCell className="text-right font-semibold text-amber-600">
-                        {totalPesoKg > 0 ? fmtMXN(r.total / totalPesoKg) : '—'}
+                        {kgFiltrado > 0 ? fmtMXN(r.total / kgFiltrado) : '—'}
                       </TableCell>
                       <TableCell className="text-right">{fmtMXN(r.costoPorHora)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">
                         {totalNomina > 0 ? ((r.total / totalNomina) * 100).toFixed(1) : '0.0'}%
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
                 <TableFooter>
                   <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
-                    <TableCell>TOTAL Administración</TableCell>
+                    <TableCell colSpan={3}>TOTAL Administración</TableCell>
                     <TableCell className="text-right">{adminPlantilla.length}</TableCell>
                     <TableCell className="text-right">{totalHoras.toLocaleString('es-MX')}</TableCell>
                     <TableCell className="text-right">{fmtMXN(totalNomina)}</TableCell>
@@ -386,7 +454,7 @@ export default function AdministracionDashboard() {
                       <TableCell className="text-right text-muted-foreground">{fmtMXN(r.ventas)}</TableCell>
                       <TableCell className="text-right">{r.peso.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                       <TableCell className="text-right text-muted-foreground">
-                        {totalPesoKg > 0 ? ((r.peso / totalPesoKg) * 100).toFixed(2) : '—'}%
+                        {kgFiltrado > 0 ? ((r.peso / kgFiltrado) * 100).toFixed(2) : '—'}%
                       </TableCell>
                       <TableCell className="text-right font-semibold text-amber-600">
                         {fmtMXN(r.cuota)}
@@ -402,7 +470,7 @@ export default function AdministracionDashboard() {
                   <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
                     <TableCell>TOTAL ({byClienteAdmin.length} clientes)</TableCell>
                     <TableCell className="text-right">{fmtMXN(byClienteAdmin.reduce((s, r) => s + r.ventas, 0))}</TableCell>
-                    <TableCell className="text-right">{totalPesoKg.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                    <TableCell className="text-right">{kgFiltrado.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
                     <TableCell className="text-right">100%</TableCell>
                     <TableCell className="text-right text-amber-300">{fmtMXN(cuotaTotal)}</TableCell>
                     <TableCell className="text-right">{fmtMXN(adminNominaTotal)}</TableCell>
@@ -464,9 +532,9 @@ export default function AdministracionDashboard() {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
-                    <TableCell colSpan={5}>TOTAL ({VENTAS_ROWS.length} registros)</TableCell>
-                    <TableCell className="text-right">{fmtMXN(VENTAS_ROWS.reduce((s, r) => s + r.importe, 0))}</TableCell>
-                    <TableCell className="text-right">{totalPesoKg.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
+                    <TableCell colSpan={5}>TOTAL ({ventasFiltradasPorMes.length} registros)</TableCell>
+                    <TableCell className="text-right">{fmtMXN(ventasFiltradasPorMes.reduce((s, r) => s + r.importe, 0))}</TableCell>
+                    <TableCell className="text-right">{kgFiltrado.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
                     <TableCell className="text-right text-amber-300">${cuotaTotal.toFixed(4)}</TableCell>
                     <TableCell className="text-right">{fmtMXN(adminNominaTotal)}</TableCell>
                   </TableRow>
@@ -554,10 +622,10 @@ export default function AdministracionDashboard() {
               <BarChart data={byMes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => fmtMXN(v)} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${((v ?? 0) / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v: any) => fmtMXN(v ?? 0)} />
                 <Bar dataKey="total" name="Nómina" fill="#1e2a5e" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="total" position="top" formatter={(v: number) => `$${(v / 1000).toFixed(1)}k`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="total" position="top" formatter={(v: any) => `$${((v ?? 0) / 1000).toFixed(1)}k`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -574,10 +642,10 @@ export default function AdministracionDashboard() {
               <BarChart data={byMes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${v.toFixed(2)}`} />
-                <Tooltip formatter={(v: number) => `$${v.toFixed(4)}`} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v ?? 0).toFixed(2)}`} />
+                <Tooltip formatter={(v: any) => `$${(v ?? 0).toFixed(4)}`} />
                 <Bar dataKey="cuota" name="$/kg" fill="#f59e0b" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="cuota" position="top" formatter={(v: number) => `$${v.toFixed(2)}`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="cuota" position="top" formatter={(v: any) => `$${(v ?? 0).toFixed(2)}`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -608,7 +676,7 @@ export default function AdministracionDashboard() {
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => fmtMXN(v)} />
+                <Tooltip formatter={(v: any) => fmtMXN(v ?? 0)} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -623,11 +691,11 @@ export default function AdministracionDashboard() {
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={byPuesto} layout="vertical" margin={{ top: 4, right: 40, left: 120, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => `$${v.toFixed(0)}`} />
+                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => `$${(v ?? 0).toFixed(0)}`} />
                 <YAxis dataKey="puesto" type="category" tick={{ fontSize: 11 }} width={115} />
-                <Tooltip formatter={(v: number) => fmtMXN(v)} />
+                <Tooltip formatter={(v: any) => fmtMXN(v ?? 0)} />
                 <Bar dataKey="costoPorHora" name="$/hora" fill="#10b981" radius={[0, 4, 4, 0]}>
-                  <LabelList dataKey="costoPorHora" position="right" formatter={(v: number) => `$${v.toFixed(2)}`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="costoPorHora" position="right" formatter={(v: any) => `$${(v ?? 0).toFixed(2)}`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -644,10 +712,10 @@ export default function AdministracionDashboard() {
               <BarChart data={resumenSecciones} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="seccion" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => fmtMXN(v)} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={v => `$${((v ?? 0) / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v: any) => fmtMXN(v ?? 0)} />
                 <Bar dataKey="total" name="Nómina total" fill="#3b82f6" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="total" position="top" formatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="total" position="top" formatter={(v: any) => `$${((v ?? 0) / 1000).toFixed(0)}k`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>

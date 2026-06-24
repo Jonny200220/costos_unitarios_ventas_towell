@@ -5,9 +5,10 @@ import type { ProductConfig } from '../data/mockData';
 
 const COLORS_VAR_FIJO = ['#4C9EEB', '#F97316'];
 
-function fmt(n: number) {
-  if (n >= 1000) return `$${(n / 1000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
+function fmt(n: number | undefined) {
+  const v = n ?? 0;
+  if (v >= 1000) return `$${(v / 1000).toFixed(1)}K`;
+  return `$${v.toFixed(0)}`;
 }
 
 function DonutCenter({ viewBox, value, label }: { viewBox?: { cx: number; cy: number }; value: string; label: string }) {
@@ -48,7 +49,7 @@ export default function Charts({ data }: { data: ProductConfig }) {
                   {construccionData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   <DonutCenter value={fmt(data.costoVariable)} label="MP" />
                 </Pie>
-                <Tooltip formatter={(v: number) => [`${v} kg`, '']} />
+                <Tooltip formatter={(v: any) => [`${v} kg`, '']} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-col gap-1">
@@ -80,7 +81,7 @@ export default function Charts({ data }: { data: ProductConfig }) {
                   {composicionData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   <DonutCenter value={fmt(data.costoTotal)} label="Total" />
                 </Pie>
-                <Tooltip formatter={(v: number) => [fmt(v), '']} />
+                <Tooltip formatter={(v: any) => [fmt(v), '']} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-col gap-1.5">
@@ -110,9 +111,9 @@ export default function Charts({ data }: { data: ProductConfig }) {
             <BarChart data={barData} layout="vertical" margin={{ left: 8, right: 40, top: 0, bottom: 0 }}>
               <XAxis type="number" hide />
               <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10, fill: '#6b7280' }} />
-              <Tooltip formatter={(v: number) => [fmt(v), '']} />
+              <Tooltip formatter={(v: any) => [fmt(v), '']} />
               <Bar dataKey="value" radius={[0, 3, 3, 0]} fill="#93C5FD">
-                <LabelList dataKey="value" position="right" formatter={fmt} style={{ fontSize: 10, fill: '#374151' }} />
+                <LabelList dataKey="value" position="right" formatter={(v: any) => fmt(v)} style={{ fontSize: 10, fill: '#374151' }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

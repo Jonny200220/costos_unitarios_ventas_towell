@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { PesosOC } from '../../../types/pesos';
-import { getPesosOC, upsertPesosOC } from '../../../services/pesosService';
+import type { PesosCliente } from '../../../types/pesos';
+import { getPesosCliente, upsertPesosCliente } from '../../../services/pesosService';
 
-export type PesosEditRow = PesosOC & { _dirty?: boolean };
+export type PesosEditRow = PesosCliente & { _dirty?: boolean };
 
 export function usePesosCRUD() {
   const [rows, setRows]       = useState<PesosEditRow[]>([]);
@@ -15,7 +15,7 @@ export function usePesosCRUD() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getPesosOC();
+      const data = await getPesosCliente();
       setRows(data.map(r => ({ ...r, _dirty: false })));
       setIsDirty(false);
     } catch (e) {
@@ -27,9 +27,9 @@ export function usePesosCRUD() {
 
   useEffect(() => { reload(); }, [reload]);
 
-  const update = useCallback((orden_venta: string, field: keyof PesosOC, value: number) => {
+  const update = useCallback((nombre_cliente: string, field: keyof PesosCliente, value: number) => {
     setRows(prev =>
-      prev.map(r => r.orden_venta === orden_venta ? { ...r, [field]: value, _dirty: true } : r)
+      prev.map(r => r.nombre_cliente === nombre_cliente ? { ...r, [field]: value, _dirty: true } : r)
     );
     setIsDirty(true);
   }, []);
@@ -39,7 +39,7 @@ export function usePesosCRUD() {
     setError(null);
     try {
       const dirty = rows.filter(r => r._dirty).map(({ _dirty: _, ...r }) => r);
-      await upsertPesosOC(dirty);
+      await upsertPesosCliente(dirty);
       setRows(prev => prev.map(r => ({ ...r, _dirty: false })));
       setIsDirty(false);
     } catch (e) {

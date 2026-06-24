@@ -12,9 +12,10 @@ import { FLETES_SOLO_URDIDO, FLETES_URDIDO_ENGOMADO, type ProductConfig } from '
 const AVAILABLE_PRODUCTS: ProductConfig[] = [FLETES_SOLO_URDIDO, FLETES_URDIDO_ENGOMADO];
 const PRODUCT_COLORS = ['#4C9EEB', '#F97316', '#8B5CF6', '#10B981'];
 
-function fmt(n: number) {
-  if (n >= 1000) return `$${(n / 1000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
+function fmt(n: number | undefined) {
+  const v = n ?? 0;
+  if (v >= 1000) return `$${(v / 1000).toFixed(1)}K`;
+  return `$${v.toFixed(2)}`;
 }
 
 function DonutCard({ product, index, onRemove, isBest }: {
@@ -223,7 +224,7 @@ export default function Comparador() {
                             <Cell fill="#4C9EEB" />
                             <Cell fill="#F97316" />
                           </Pie>
-                          <Tooltip formatter={(v: number) => [fmt(v), '']} />
+                          <Tooltip formatter={(v: any) => [fmt(v), '']} />
                         </PieChart>
                       </ResponsiveContainer>
                       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -254,8 +255,8 @@ export default function Comparador() {
             <BarChart data={barData} margin={{ top: 5, right: 20, left: 10, bottom: 60 }}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
               <XAxis dataKey="concepto" tick={{ fontSize: 11, fill: '#6b7280' }} angle={-30} textAnchor="end" interval={0} />
-              <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}K`} />
-              <Tooltip formatter={(v: number) => [fmt(v), '']} />
+              <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} tickFormatter={(v) => `$${((v ?? 0) / 1000).toFixed(0)}K`} />
+              <Tooltip formatter={(v: any) => [fmt(v), '']} />
               <Legend />
               {products.map((_, pi) => (
                 <Bar key={pi} dataKey={`P${pi + 1}`} fill={PRODUCT_COLORS[pi]} radius={[3, 3, 0, 0]} />
