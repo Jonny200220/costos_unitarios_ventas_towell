@@ -81,6 +81,25 @@ export default function MaterialEmpaqueDashboard() {
   const resumenPag = usePagination(byCliente, 25);
   const detallePag = usePagination(filtered, 50);
 
+  const byArticuloME = useMemo<{ cliente: string; articulo: string; peso: number; ventas: number; me: number }[]>(() => {
+    const map: Record<string, { peso: number; ventas: number; me: number }> = {};
+    filtered.forEach(r => {
+      const key = `${r.nombre_cliente}||${r.nombre_articulo}`;
+      if (!map[key]) map[key] = { peso: 0, ventas: 0, me: 0 };
+      map[key].peso += r.peso_std;
+      map[key].ventas += r.importe;
+      map[key].me += r.monto_me;
+    });
+    return Object.entries(map)
+      .map(([key, v]) => {
+        const [cliente, articulo] = key.split('||');
+        return { cliente, articulo, ...v };
+      })
+      .sort((a, b) => b.me - a.me);
+  }, [filtered]);
+
+  const byArticuloMEPag = usePagination(byArticuloME, 50);
+
   return (
     <div className="space-y-6">
       {/* Barra de filtros */}
@@ -166,6 +185,7 @@ export default function MaterialEmpaqueDashboard() {
         <TabsList className="bg-white ring-1 ring-foreground/10 shadow-xs h-9 mb-4">
           <TabsTrigger value="resumen_cliente" className="text-sm">Resumen por Cliente</TabsTrigger>
           <TabsTrigger value="detalle" className="text-sm">Detalle por Línea</TabsTrigger>
+          <TabsTrigger value="cuotas_articulo" className="text-sm">Cuotas por Cliente y Artículo</TabsTrigger>
         </TabsList>
 
         {/* Resumen por cliente */}
@@ -282,6 +302,68 @@ export default function MaterialEmpaqueDashboard() {
               totalItems={filtered.length}
               pageSize={detallePag.pageSize}
               onPageChange={detallePag.setPage}
+            />
+          </div>
+        </TabsContent>
+
+        {/* Cuotas por Cliente y Artículo */}
+        <TabsContent value="cuotas_articulo" className="mt-0">
+          <div className="rounded-xl overflow-hidden ring-1 ring-foreground/10 shadow-xs">
+            <div className="overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
+                    <TableHead className="text-white font-semibold text-xs">Cliente</TableHead>
+                    <TableHead className="text-white font-semibold text-xs">Artículo</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Ventas</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Peso (kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">% del Total</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Mat. Empaque</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Cuota ME ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">% s/Ventas</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {byArticuloMEPag.paged.map((r, i) => (
+                    <TableRow key={i} className="text-xs">
+                      <TableCell className="font-medium max-w-[160px] truncate py-1.5" title={r.cliente}>{r.cliente}</TableCell>
+                      <TableCell className="max-w-[200px] truncate py-1.5" title={r.articulo}>{r.articulo}</TableCell>
+                      <TableCell className="text-right text-muted-foreground py-1.5">{fmt(r.ventas)}</TableCell>
+                      <TableCell className="text-right py-1.5">{r.peso.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
+                      <TableCell className="text-right text-muted-foreground py-1.5">
+                        {totalPeso > 0 ? ((r.peso / totalPeso) * 100).toFixed(2) : '—'}%
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-[#1e2a5e] py-1.5">{r.me > 0 ? fmt(r.me) : '—'}</TableCell>
+                      <TableCell className="text-right font-semibold text-sky-600 py-1.5">
+                        {r.peso > 0 && r.me > 0 ? `$${(r.me / r.peso).toFixed(4)}` : '—'}
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground py-1.5">
+                        {r.ventas > 0 ? ((r.me / r.ventas) * 100).toFixed(2) : '—'}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold text-xs">
+                    <TableCell colSpan={2}>TOTAL ({byArticuloME.length} combinaciones)</TableCell>
+                    <TableCell className="text-right">{fmt(totalVentas)}</TableCell>
+                    <TableCell className="text-right">{totalPeso.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
+                    <TableCell className="text-right">100%</TableCell>
+                    <TableCell className="text-right">{fmt(totalGeneral)}</TableCell>
+                    <TableCell className="text-right text-sky-300">{totalPeso > 0 ? `$${cuotaTotal.toFixed(4)}` : '—'}</TableCell>
+                    <TableCell className="text-right">
+                      {totalVentas > 0 ? ((totalGeneral / totalVentas) * 100).toFixed(2) : '—'}%
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+            <TablePagination
+              page={byArticuloMEPag.page}
+              totalPages={byArticuloMEPag.totalPages}
+              totalItems={byArticuloME.length}
+              pageSize={byArticuloMEPag.pageSize}
+              onPageChange={byArticuloMEPag.setPage}
             />
           </div>
         </TabsContent>

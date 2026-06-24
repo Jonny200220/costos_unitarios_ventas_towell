@@ -85,6 +85,26 @@ export default function FletesDashboard() {
   const resumenPag = usePagination(byCliente, 25);
   const detallePag = usePagination(filtered, 50);
 
+  const byArticuloFletes = useMemo<{ cliente: string; articulo: string; peso: number; ventas: number; flete: number; maniobras: number }[]>(() => {
+    const map: Record<string, { peso: number; ventas: number; flete: number; maniobras: number }> = {};
+    filtered.forEach(r => {
+      const key = `${r.nombre_cliente}||${r.nombre_articulo}`;
+      if (!map[key]) map[key] = { peso: 0, ventas: 0, flete: 0, maniobras: 0 };
+      map[key].peso += r.peso_std;
+      map[key].ventas += r.importe;
+      map[key].flete += r.monto_fle;
+      map[key].maniobras += r.monto_myo;
+    });
+    return Object.entries(map)
+      .map(([key, v]) => {
+        const [cliente, articulo] = key.split('||');
+        return { cliente, articulo, ...v };
+      })
+      .sort((a, b) => (b.flete + b.maniobras) - (a.flete + a.maniobras));
+  }, [filtered]);
+
+  const byArticuloFletesPag = usePagination(byArticuloFletes, 50);
+
   return (
     <div className="space-y-6">
       {/* Barra de filtros */}
@@ -170,42 +190,43 @@ export default function FletesDashboard() {
         <TabsList className="bg-white ring-1 ring-foreground/10 shadow-xs h-9 mb-4">
           <TabsTrigger value="resumen_cliente" className="text-sm">Resumen por Cliente</TabsTrigger>
           <TabsTrigger value="detalle" className="text-sm">Detalle por Línea</TabsTrigger>
+          <TabsTrigger value="cuotas_articulo" className="text-sm">Cuotas por Cliente y Artículo</TabsTrigger>
         </TabsList>
 
         {/* Resumen por cliente */}
         <TabsContent value="resumen_cliente" className="mt-0">
           <div className="rounded-xl overflow-hidden ring-1 ring-foreground/10 shadow-xs">
-            <div className="overflow-auto">
-              <Table>
+            <div className="overflow-auto max-h-[520px]">
+              <Table className="text-xs">
                 <TableHeader>
                   <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
-                    <TableHead className="text-white font-semibold">Cliente</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Ventas</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Peso (kg)</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Fletes</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Cuota Flete ($/kg)</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Maniobras</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Cuota Maniobras ($/kg)</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Total Logística</TableHead>
-                    <TableHead className="text-white font-semibold text-right">% s/Ventas</TableHead>
+                    <TableHead className="text-white font-semibold text-xs">Cliente</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Ventas</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Peso (kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Fletes</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Cuota Flete ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Maniobras</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Cuota Maniobras ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Total Logística</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">% s/Ventas</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {resumenPag.paged.map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium max-w-[180px] truncate" title={r.cliente}>{r.cliente}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{fmt(r.ventas)}</TableCell>
-                      <TableCell className="text-right">{r.peso.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
-                      <TableCell className="text-right">{r.flete > 0 ? fmt(r.flete) : '—'}</TableCell>
-                      <TableCell className="text-right font-semibold text-sky-600">
+                    <TableRow key={i} className="text-xs">
+                      <TableCell className="font-medium max-w-[180px] truncate py-1.5" title={r.cliente}>{r.cliente}</TableCell>
+                      <TableCell className="text-right text-muted-foreground py-1.5">{fmt(r.ventas)}</TableCell>
+                      <TableCell className="text-right py-1.5">{r.peso.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</TableCell>
+                      <TableCell className="text-right py-1.5">{r.flete > 0 ? fmt(r.flete) : '—'}</TableCell>
+                      <TableCell className="text-right font-semibold text-sky-600 py-1.5">
                         {r.peso > 0 && r.flete > 0 ? `$${(r.flete / r.peso).toFixed(4)}` : '—'}
                       </TableCell>
-                      <TableCell className="text-right">{r.maniobras > 0 ? fmt(r.maniobras) : '—'}</TableCell>
-                      <TableCell className="text-right font-semibold text-orange-500">
+                      <TableCell className="text-right py-1.5">{r.maniobras > 0 ? fmt(r.maniobras) : '—'}</TableCell>
+                      <TableCell className="text-right font-semibold text-orange-500 py-1.5">
                         {r.peso > 0 && r.maniobras > 0 ? `$${(r.maniobras / r.peso).toFixed(4)}` : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-[#1e2a5e]">{r.total > 0 ? fmt(r.total) : '—'}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">
+                      <TableCell className="text-right font-semibold text-[#1e2a5e] py-1.5">{r.total > 0 ? fmt(r.total) : '—'}</TableCell>
+                      <TableCell className="text-right text-muted-foreground py-1.5">
                         {r.ventas > 0 ? ((r.total / r.ventas) * 100).toFixed(2) : '—'}%
                       </TableCell>
                     </TableRow>
@@ -241,45 +262,45 @@ export default function FletesDashboard() {
         {/* Detalle por línea */}
         <TabsContent value="detalle" className="mt-0">
           <div className="rounded-xl overflow-hidden ring-1 ring-foreground/10 shadow-xs">
-            <div className="overflow-auto">
-              <Table>
+            <div className="overflow-auto max-h-[520px]">
+              <Table className="text-xs">
                 <TableHeader>
                   <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
-                    <TableHead className="text-white font-semibold">Cliente</TableHead>
-                    <TableHead className="text-white font-semibold">Artículo</TableHead>
-                    <TableHead className="text-white font-semibold">Tamaño</TableHead>
-                    <TableHead className="text-white font-semibold">Color</TableHead>
-                    <TableHead className="text-white font-semibold text-center">Mes</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Importe Venta</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Peso (kg)</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Flete</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Cuota Flete ($/kg)</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Maniobras</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Cuota Maniobras ($/kg)</TableHead>
-                    <TableHead className="text-white font-semibold text-right">Total</TableHead>
+                    <TableHead className="text-white font-semibold text-xs">Cliente</TableHead>
+                    <TableHead className="text-white font-semibold text-xs">Artículo</TableHead>
+                    <TableHead className="text-white font-semibold text-xs">Tamaño</TableHead>
+                    <TableHead className="text-white font-semibold text-xs">Color</TableHead>
+                    <TableHead className="text-white font-semibold text-center text-xs">Mes</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Importe Venta</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Peso (kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Flete</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Cuota Flete ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Maniobras</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Cuota Maniobras ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {detallePag.paged.map((r, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="font-medium max-w-[160px] truncate" title={r.nombre_cliente}>{r.nombre_cliente}</TableCell>
-                      <TableCell className="max-w-[180px] truncate" title={r.nombre_articulo}>{r.nombre_articulo}</TableCell>
-                      <TableCell>{r.tamano}</TableCell>
-                      <TableCell>{r.color}</TableCell>
-                      <TableCell className="text-center">
+                    <TableRow key={i} className="text-xs">
+                      <TableCell className="font-medium max-w-[160px] truncate py-1.5" title={r.nombre_cliente}>{r.nombre_cliente}</TableCell>
+                      <TableCell className="max-w-[180px] truncate py-1.5" title={r.nombre_articulo}>{r.nombre_articulo}</TableCell>
+                      <TableCell className="py-1.5">{r.tamano}</TableCell>
+                      <TableCell className="py-1.5">{r.color}</TableCell>
+                      <TableCell className="text-center py-1.5">
                         <Badge variant="secondary" className="uppercase text-xs">{r.mes}</Badge>
                       </TableCell>
-                      <TableCell className="text-right text-muted-foreground">{fmt(r.importe)}</TableCell>
-                      <TableCell className="text-right">{r.peso_std.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
-                      <TableCell className="text-right">{r.monto_fle > 0 ? fmt(r.monto_fle) : '—'}</TableCell>
-                      <TableCell className="text-right font-semibold text-sky-600">
+                      <TableCell className="text-right text-muted-foreground py-1.5">{fmt(r.importe)}</TableCell>
+                      <TableCell className="text-right py-1.5">{r.peso_std.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
+                      <TableCell className="text-right py-1.5">{r.monto_fle > 0 ? fmt(r.monto_fle) : '—'}</TableCell>
+                      <TableCell className="text-right font-semibold text-sky-600 py-1.5">
                         {r.peso_std > 0 && r.monto_fle > 0 ? `$${(r.monto_fle / r.peso_std).toFixed(4)}` : '—'}
                       </TableCell>
-                      <TableCell className="text-right">{r.monto_myo > 0 ? fmt(r.monto_myo) : '—'}</TableCell>
-                      <TableCell className="text-right font-semibold text-orange-500">
+                      <TableCell className="text-right py-1.5">{r.monto_myo > 0 ? fmt(r.monto_myo) : '—'}</TableCell>
+                      <TableCell className="text-right font-semibold text-orange-500 py-1.5">
                         {r.peso_std > 0 && r.monto_myo > 0 ? `$${(r.monto_myo / r.peso_std).toFixed(4)}` : '—'}
                       </TableCell>
-                      <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmt(r.monto_fle + r.monto_myo)}</TableCell>
+                      <TableCell className="text-right font-semibold text-[#1e2a5e] py-1.5">{fmt(r.monto_fle + r.monto_myo)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -303,6 +324,76 @@ export default function FletesDashboard() {
               totalItems={filtered.length}
               pageSize={detallePag.pageSize}
               onPageChange={detallePag.setPage}
+            />
+          </div>
+        </TabsContent>
+        {/* Cuotas por Cliente y Artículo */}
+        <TabsContent value="cuotas_articulo" className="mt-0">
+          <div className="rounded-xl overflow-hidden ring-1 ring-foreground/10 shadow-xs">
+            <div className="overflow-auto max-h-[520px]">
+              <Table className="text-xs">
+                <TableHeader>
+                  <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
+                    <TableHead className="text-white font-semibold text-xs">Cliente</TableHead>
+                    <TableHead className="text-white font-semibold text-xs">Artículo</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Ventas</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Peso (kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Fletes</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Cuota Flete ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Maniobras</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Cuota Maniobras ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Total Logística</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">% s/Ventas</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {byArticuloFletesPag.paged.map((r, i) => {
+                    const total = r.flete + r.maniobras;
+                    return (
+                      <TableRow key={i} className="text-xs">
+                        <TableCell className="font-medium max-w-[160px] truncate py-1.5" title={r.cliente}>{r.cliente}</TableCell>
+                        <TableCell className="max-w-[200px] truncate py-1.5" title={r.articulo}>{r.articulo}</TableCell>
+                        <TableCell className="text-right text-muted-foreground py-1.5">{fmt(r.ventas)}</TableCell>
+                        <TableCell className="text-right py-1.5">{r.peso.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
+                        <TableCell className="text-right py-1.5">{r.flete > 0 ? fmt(r.flete) : '—'}</TableCell>
+                        <TableCell className="text-right font-semibold text-sky-600 py-1.5">
+                          {r.peso > 0 && r.flete > 0 ? `$${(r.flete / r.peso).toFixed(4)}` : '—'}
+                        </TableCell>
+                        <TableCell className="text-right py-1.5">{r.maniobras > 0 ? fmt(r.maniobras) : '—'}</TableCell>
+                        <TableCell className="text-right font-semibold text-orange-500 py-1.5">
+                          {r.peso > 0 && r.maniobras > 0 ? `$${(r.maniobras / r.peso).toFixed(4)}` : '—'}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-[#1e2a5e] py-1.5">{total > 0 ? fmt(total) : '—'}</TableCell>
+                        <TableCell className="text-right text-muted-foreground py-1.5">
+                          {r.ventas > 0 ? ((total / r.ventas) * 100).toFixed(2) : '—'}%
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold text-xs">
+                    <TableCell colSpan={2}>TOTAL ({byArticuloFletes.length} combinaciones)</TableCell>
+                    <TableCell className="text-right">{fmt(totalVentas)}</TableCell>
+                    <TableCell className="text-right">{totalPeso.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
+                    <TableCell className="text-right">{fmt(totalFlete)}</TableCell>
+                    <TableCell className="text-right text-sky-300">{totalPeso > 0 ? `$${cuotaFlete.toFixed(4)}` : '—'}</TableCell>
+                    <TableCell className="text-right">{fmt(totalManiobras)}</TableCell>
+                    <TableCell className="text-right text-orange-300">{totalPeso > 0 ? `$${cuotaManiobras.toFixed(4)}` : '—'}</TableCell>
+                    <TableCell className="text-right">{fmt(totalGeneral)}</TableCell>
+                    <TableCell className="text-right">
+                      {totalVentas > 0 ? ((totalGeneral / totalVentas) * 100).toFixed(2) : '—'}%
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+            <TablePagination
+              page={byArticuloFletesPag.page}
+              totalPages={byArticuloFletesPag.totalPages}
+              totalItems={byArticuloFletes.length}
+              pageSize={byArticuloFletesPag.pageSize}
+              onPageChange={byArticuloFletesPag.setPage}
             />
           </div>
         </TabsContent>

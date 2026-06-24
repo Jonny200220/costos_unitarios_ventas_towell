@@ -152,6 +152,31 @@ export default function PreparacionDashboard() {
 
   const cuotaClientePag = usePagination(byClientePrep, 25);
 
+  const byArticuloPrep = useMemo<{ cliente: string; articulo: string; peso: number; ventas: number; monto: number; cuota: number }[]>(() => {
+    const map: Record<string, { peso: number; ventas: number }> = {};
+    VENTAS_ROWS.forEach(r => {
+      const key = `${r.nombre_cliente}||${r.nombre_articulo}`;
+      if (!map[key]) map[key] = { peso: 0, ventas: 0 };
+      map[key].peso += r.peso_std;
+      map[key].ventas += r.importe;
+    });
+    return Object.entries(map)
+      .map(([key, v]) => {
+        const [cliente, articulo] = key.split('||');
+        return {
+          cliente,
+          articulo,
+          peso: v.peso,
+          ventas: v.ventas,
+          monto: totalPesoKg > 0 ? (v.peso / totalPesoKg) * prepNominaTotal : 0,
+          cuota: totalPesoKg > 0 ? prepNominaTotal / totalPesoKg : 0,
+        };
+      })
+      .sort((a, b) => b.monto - a.monto);
+  }, [prepNominaTotal]);
+
+  const byArticuloPrepPag = usePagination(byArticuloPrep, 50);
+
   const detalleLineasPrep = useMemo(() =>
     VENTAS_ROWS.map(r => ({
       ...r,
@@ -289,6 +314,7 @@ export default function PreparacionDashboard() {
           <TabsTrigger value="detalle" className="text-sm">Detalle por Periodo</TabsTrigger>
           <TabsTrigger value="cuotas_cliente" className="text-sm">Cuotas por Cliente</TabsTrigger>
           <TabsTrigger value="cuotas_linea" className="text-sm">Cuotas por Línea</TabsTrigger>
+          <TabsTrigger value="cuotas_articulo" className="text-sm">Cuotas por Cliente y Artículo</TabsTrigger>
         </TabsList>
 
         {/* Resumen por puesto */}
@@ -495,6 +521,70 @@ export default function PreparacionDashboard() {
               totalItems={VENTAS_ROWS.length}
               pageSize={detalleLineasPag.pageSize}
               onPageChange={detalleLineasPag.setPage}
+            />
+          </div>
+        </TabsContent>
+
+        {/* Cuotas por Cliente y Artículo */}
+        <TabsContent value="cuotas_articulo" className="mt-0">
+          <div className="rounded-xl overflow-hidden ring-1 ring-foreground/10 shadow-xs">
+            <div className="overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
+                    <TableHead className="text-white font-semibold text-xs">Cliente</TableHead>
+                    <TableHead className="text-white font-semibold text-xs">Artículo</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Ventas</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Peso (kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">% kg s/Total</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Cuota Prep. ($/kg)</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">Monto Prep.</TableHead>
+                    <TableHead className="text-white font-semibold text-right text-xs">% s/Ventas</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {byArticuloPrepPag.paged.map((r, i) => (
+                    <TableRow key={i} className="text-xs">
+                      <TableCell className="font-medium max-w-[160px] truncate py-1.5" title={r.cliente}>{r.cliente}</TableCell>
+                      <TableCell className="max-w-[200px] truncate py-1.5" title={r.articulo}>{r.articulo}</TableCell>
+                      <TableCell className="text-right text-muted-foreground py-1.5">{fmtMXN(r.ventas)}</TableCell>
+                      <TableCell className="text-right py-1.5">{r.peso.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
+                      <TableCell className="text-right text-muted-foreground py-1.5">
+                        {totalPesoKg > 0 ? ((r.peso / totalPesoKg) * 100).toFixed(2) : '—'}%
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-violet-600 py-1.5">
+                        {r.cuota > 0 ? `$${r.cuota.toFixed(4)}` : '—'}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-[#1e2a5e] py-1.5">{fmtMXN(r.monto)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground py-1.5">
+                        {r.ventas > 0 ? ((r.monto / r.ventas) * 100).toFixed(2) : '—'}%
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold text-xs">
+                    <TableCell colSpan={2}>TOTAL ({byArticuloPrep.length} combinaciones)</TableCell>
+                    <TableCell className="text-right">{fmtMXN(byArticuloPrep.reduce((s, r) => s + r.ventas, 0))}</TableCell>
+                    <TableCell className="text-right">{totalPesoKg.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
+                    <TableCell className="text-right">100%</TableCell>
+                    <TableCell className="text-right text-violet-300">${cuotaTotal.toFixed(4)}</TableCell>
+                    <TableCell className="text-right">{fmtMXN(prepNominaTotal)}</TableCell>
+                    <TableCell className="text-right">
+                      {byArticuloPrep.reduce((s, r) => s + r.ventas, 0) > 0
+                        ? ((prepNominaTotal / byArticuloPrep.reduce((s, r) => s + r.ventas, 0)) * 100).toFixed(2)
+                        : '—'}%
+                    </TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+            <TablePagination
+              page={byArticuloPrepPag.page}
+              totalPages={byArticuloPrepPag.totalPages}
+              totalItems={byArticuloPrep.length}
+              pageSize={byArticuloPrepPag.pageSize}
+              onPageChange={byArticuloPrepPag.setPage}
             />
           </div>
         </TabsContent>
