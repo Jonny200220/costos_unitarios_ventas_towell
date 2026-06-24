@@ -42,8 +42,8 @@ export default function Dashboard({ title, soloData, engomadoData: _engomadoData
         <TabsList className="mb-5 h-auto flex-wrap gap-1 bg-white ring-1 ring-foreground/10 shadow-xs p-1">
           {COST_TABS.map(({ label, value }) => (
             <TabsTrigger
-              key={value}
-              value={value}
+            key={value}
+            value={value}
               className="data-active:bg-[#1e2a5e] data-active:text-white data-active:shadow text-sm"
             >
               {label}
