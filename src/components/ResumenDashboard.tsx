@@ -16,6 +16,7 @@ import { fmtMXN } from '../lib/format';
 import { getPesosCliente } from '../services/pesosService';
 import type { PesosCliente } from '../types/pesos';
 import { queryKeys } from '../lib/queryKeys';
+import { effectiveWeight } from '../lib/formulaConfig';
 
 function fmt2(n: number) { return `$${n.toFixed(2)}`; }
 
@@ -109,8 +110,10 @@ export default function ResumenDashboard() {
 
   // ── Cálculo ponderado por cliente ──────────────────────────────────────────
   const baseRows = useMemo<ItemResumen[]>(() => {
-    const getPeso = (cliente: string, field: keyof Omit<PesosCliente, 'nombre_cliente'>): number =>
+    const getVal = (cliente: string, field: keyof Omit<PesosCliente, 'nombre_cliente'>): number =>
       pesosMap.get(cliente)?.[field] ?? 1;
+    const ew = (c: string, pF: keyof Omit<PesosCliente, 'nombre_cliente'>, tF: keyof Omit<PesosCliente, 'nombre_cliente'>) =>
+      effectiveWeight(getVal(c, pF), getVal(c, tF));
 
     const clienteKg: Record<string, number> = {};
     filteredRows.forEach(r => {
@@ -123,26 +126,27 @@ export default function ResumenDashboard() {
     const tPrep  = NOMINA_TOTALES['Preparación']    ?? 0;
     const tEmb   = NOMINA_TOTALES['Embarques']      ?? 0;
 
+    // Denominadores Σ(kg × peso_efectivo)
     let dAdmin = 0, dAlm = 0, dPrep = 0, dEmb = 0, dMe = 0, dFle = 0;
     clientes.forEach(c => {
       const kg = clienteKg[c];
-      dAdmin += kg * getPeso(c, 'peso_admin');
-      dAlm   += kg * getPeso(c, 'peso_almacen');
-      dPrep  += kg * getPeso(c, 'peso_preparacion');
-      dEmb   += kg * getPeso(c, 'peso_embarque');
-      dMe    += kg * getPeso(c, 'peso_me');
-      dFle   += kg * getPeso(c, 'peso_fletes');
+      dAdmin += kg * ew(c, 'peso_admin',       'tiempo_admin');
+      dAlm   += kg * ew(c, 'peso_almacen',     'tiempo_almacen');
+      dPrep  += kg * ew(c, 'peso_preparacion', 'tiempo_preparacion');
+      dEmb   += kg * ew(c, 'peso_embarque',    'tiempo_embarque');
+      dMe    += kg * ew(c, 'peso_me',          'tiempo_me');
+      dFle   += kg * ew(c, 'peso_fletes',      'tiempo_fletes');
     });
 
     const cuotaCliente: Record<string, { admin: number; alm: number; prep: number; emb: number; me: number; fle: number }> = {};
     clientes.forEach(c => {
       cuotaCliente[c] = {
-        admin: dAdmin > 0 ? tAdmin       * getPeso(c, 'peso_admin')       / dAdmin : 0,
-        alm:   dAlm   > 0 ? tAlm         * getPeso(c, 'peso_almacen')     / dAlm   : 0,
-        prep:  dPrep  > 0 ? tPrep        * getPeso(c, 'peso_preparacion') / dPrep  : 0,
-        emb:   dEmb   > 0 ? tEmb         * getPeso(c, 'peso_embarque')    / dEmb   : 0,
-        me:    dMe    > 0 ? TOTAL_ME     * getPeso(c, 'peso_me')          / dMe    : 0,
-        fle:   dFle   > 0 ? TOTAL_FLETE  * getPeso(c, 'peso_fletes')      / dFle   : 0,
+        admin: dAdmin > 0 ? tAdmin      * ew(c, 'peso_admin',       'tiempo_admin')       / dAdmin : 0,
+        alm:   dAlm   > 0 ? tAlm        * ew(c, 'peso_almacen',     'tiempo_almacen')     / dAlm   : 0,
+        prep:  dPrep  > 0 ? tPrep       * ew(c, 'peso_preparacion', 'tiempo_preparacion') / dPrep  : 0,
+        emb:   dEmb   > 0 ? tEmb        * ew(c, 'peso_embarque',    'tiempo_embarque')    / dEmb   : 0,
+        me:    dMe    > 0 ? TOTAL_ME    * ew(c, 'peso_me',          'tiempo_me')          / dMe    : 0,
+        fle:   dFle   > 0 ? TOTAL_FLETE * ew(c, 'peso_fletes',      'tiempo_fletes')      / dFle   : 0,
       };
     });
 

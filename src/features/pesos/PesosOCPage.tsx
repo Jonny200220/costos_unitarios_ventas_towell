@@ -10,6 +10,7 @@ import { AREAS } from '../../types/pesos';
 import type { PesosCliente } from '../../types/pesos';
 import { fmtNum } from '../../lib/format';
 import { ALL_ROWS } from '../../hooks/useSalesData';
+import { FORMULA_MODE } from '../../lib/formulaConfig';
 
 // ─── KG y OC count por cliente ────────────────────────────────────────────────
 
@@ -17,22 +18,33 @@ const STATS_POR_CLIENTE = new Map<string, { kg: number; ocs: Set<string> }>();
 ALL_ROWS.forEach(r => {
   if (!r.nombre_cliente) return;
   const prev = STATS_POR_CLIENTE.get(r.nombre_cliente);
-  if (prev) { prev.kg += r.peso_std; if (r.orden_venta) prev.ocs.add(r.orden_venta); }
-  else STATS_POR_CLIENTE.set(r.nombre_cliente, { kg: r.peso_std, ocs: new Set(r.orden_venta ? [r.orden_venta] : []) });
+  if (prev) {
+    prev.kg += r.peso_std;
+    if (r.orden_venta) prev.ocs.add(r.orden_venta);
+  } else {
+    STATS_POR_CLIENTE.set(r.nombre_cliente, {
+      kg: r.peso_std,
+      ocs: new Set(r.orden_venta ? [r.orden_venta] : []),
+    });
+  }
 });
 
-// ─── Selector compacto 1-2-3-4 ────────────────────────────────────────────────
+// ─── Selector de peso 1-2-3-4 ────────────────────────────────────────────────
 
 function WeightSelector({ value, onChange, activeColor }: {
-  value: number; onChange: (v: number) => void; activeColor: string;
+  value: number;
+  onChange: (v: number) => void;
+  activeColor: string;
 }) {
   return (
-    <div className="flex gap-0.5">
+    <div className="flex gap-0.5 justify-center">
       {([1, 2, 3, 4] as const).map(v => (
         <button key={v} type="button" onClick={() => onChange(v)}
           className={[
             'w-6 h-6 rounded text-xs font-bold transition-colors',
-            value === v ? `${activeColor} text-white shadow-sm` : 'bg-muted text-muted-foreground hover:bg-muted-foreground/20',
+            value === v
+              ? `${activeColor} text-white shadow-sm`
+              : 'bg-muted text-muted-foreground hover:bg-muted-foreground/20',
           ].join(' ')}
         >
           {v}
@@ -41,6 +53,43 @@ function WeightSelector({ value, onChange, activeColor }: {
     </div>
   );
 }
+
+// ─── Input de tiempo (min/kg) ─────────────────────────────────────────────────
+
+function TiempoInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [raw, setRaw] = useState('');
+  const [focused, setFocused] = useState(false);
+
+  const display = focused ? raw : value.toFixed(1);
+
+  return (
+    <div className="flex items-center gap-1 justify-center">
+      <input
+        type="number"
+        min="0.1"
+        step="0.1"
+        value={display}
+        className="w-14 h-6 rounded border border-input bg-background px-1.5 text-xs text-center tabular-nums focus:outline-none focus:ring-1 focus:ring-[#1e2a5e]/50"
+        onFocus={() => { setRaw(value.toFixed(1)); setFocused(true); }}
+        onChange={e => setRaw(e.target.value)}
+        onBlur={() => {
+          setFocused(false);
+          const n = parseFloat(raw);
+          if (!isNaN(n) && n > 0) onChange(Math.round(n * 10) / 10);
+        }}
+      />
+      <span className="text-[10px] text-muted-foreground">min</span>
+    </div>
+  );
+}
+
+// ─── Leyenda de la fórmula activa ─────────────────────────────────────────────
+
+const FORMULA_LABELS: Record<string, string> = {
+  tiempo_x_peso: 'Peso efectivo = Tiempo × Esfuerzo',
+  tiempo:        'Peso efectivo = Tiempo (ignora esfuerzo)',
+  peso:          'Peso efectivo = Esfuerzo (ignora tiempo)',
+};
 
 // ─── Página ───────────────────────────────────────────────────────────────────
 
@@ -53,7 +102,7 @@ export default function PesosClientePage() {
     return rows.filter(r => !q || r.nombre_cliente.toLowerCase().includes(q));
   }, [rows, search]);
 
-  const thC = 'text-white font-semibold text-xs py-2 whitespace-nowrap sticky top-0 bg-[#1e2a5e]';
+  const thC = 'text-white font-semibold text-xs py-2 whitespace-nowrap sticky top-0 bg-[#1e2a5e] text-center';
 
   return (
     <div className="space-y-5">
@@ -64,11 +113,10 @@ export default function PesosClientePage() {
             <Sliders className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-bold text-[#1e2a5e]">Pesos por Cliente</h2>
-            <p className="text-xs text-muted-foreground max-w-xl">
-              Asigna un nivel de esfuerzo del <strong>1 al 4</strong> por área para cada cliente.
-              Todas sus órdenes de compra heredan estos pesos automáticamente.
-              Con todos en 1, el costo se distribuye proporcional al kg.
+            <h2 className="text-lg font-bold text-[#1e2a5e]">Configuración por Cliente</h2>
+            <p className="text-xs text-muted-foreground max-w-2xl">
+              Define el <strong>esfuerzo (1-4)</strong> y el <strong>tiempo (min/kg)</strong> por área para cada cliente.
+              Ambos factores afectan directamente la cuota unitaria asignada.
             </p>
           </div>
         </div>
@@ -87,11 +135,18 @@ export default function PesosClientePage() {
         )}
       </div>
 
+      {/* Fórmula activa */}
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/60 border border-border text-xs text-muted-foreground w-fit">
+        <span className="font-semibold text-foreground">Fórmula activa:</span>
+        {FORMULA_LABELS[FORMULA_MODE]}
+        <span className="ml-1 text-[10px] opacity-60">(src/lib/formulaConfig.ts)</span>
+      </div>
+
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{error}</div>
       )}
 
-      {/* Leyenda + buscador */}
+      {/* Buscador + leyenda de colores */}
       <div className="flex flex-wrap items-center gap-4">
         <div className="relative max-w-xs flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -112,18 +167,37 @@ export default function PesosClientePage() {
         <div className="py-12 text-center text-muted-foreground text-sm">Cargando clientes...</div>
       ) : (
         <div className="rounded-xl overflow-hidden ring-1 ring-foreground/10 shadow-xs">
-          <div className="overflow-auto max-h-[480px]">
+          <div className="overflow-auto max-h-[560px]">
             <Table>
               <TableHeader>
+                {/* Fila 1: área */}
                 <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
-                  <TableHead className={`${thC} text-left`}>Cliente</TableHead>
-                  <TableHead className={`${thC} text-right`}>OCs</TableHead>
-                  <TableHead className={`${thC} text-right`}>Kg Total</TableHead>
+                  <TableHead className={`${thC} text-left`} rowSpan={2}>Cliente</TableHead>
+                  <TableHead className={`${thC} text-right`} rowSpan={2}>OCs</TableHead>
+                  <TableHead className={`${thC} text-right`} rowSpan={2}>Kg</TableHead>
                   {AREAS.map(a => (
-                    <TableHead key={a.key} className={`${thC} text-center`}>{a.label}</TableHead>
+                    <TableHead key={a.key} className={`${thC} border-l border-white/10`} colSpan={2}>
+                      {a.label}
+                    </TableHead>
+                  ))}
+                </TableRow>
+                {/* Fila 2: sub-columnas */}
+                <TableRow className="bg-[#1e2a5e]/90 hover:bg-[#1e2a5e]/90">
+                  {AREAS.map(a => (
+                    <>
+                      <TableHead key={`${a.key}-e`}
+                        className="text-white/70 font-medium text-[10px] py-1.5 text-center sticky top-[33px] bg-[#1e2a5e]/90 border-l border-white/10 whitespace-nowrap">
+                        Esfuerzo
+                      </TableHead>
+                      <TableHead key={`${a.key}-t`}
+                        className="text-white/70 font-medium text-[10px] py-1.5 text-center sticky top-[33px] bg-[#1e2a5e]/90 whitespace-nowrap">
+                        min/kg
+                      </TableHead>
+                    </>
                   ))}
                 </TableRow>
               </TableHeader>
+
               <TableBody>
                 {filtered.map((row, i) => {
                   const stats = STATS_POR_CLIENTE.get(row.nombre_cliente);
@@ -134,7 +208,7 @@ export default function PesosClientePage() {
                         row._dirty ? 'ring-1 ring-inset ring-amber-400/60' : '',
                       ].join(' ')}
                     >
-                      <TableCell className="text-xs font-medium py-2 max-w-[200px] truncate"
+                      <TableCell className="text-xs font-medium py-2 max-w-[180px] truncate"
                         title={row.nombre_cliente}>
                         {row.nombre_cliente}
                       </TableCell>
@@ -144,16 +218,23 @@ export default function PesosClientePage() {
                       <TableCell className="text-xs text-right py-2 text-muted-foreground">
                         {fmtNum(stats?.kg ?? 0, 0)}
                       </TableCell>
+
                       {AREAS.map(a => (
-                        <TableCell key={a.key} className="py-2 text-center">
-                          <div className="flex justify-center">
+                        <>
+                          <TableCell key={`${a.key}-peso`} className="py-1.5 border-l border-border/30">
                             <WeightSelector
-                              value={row[a.field as keyof PesosCliente] as number}
-                              onChange={v => update(row.nombre_cliente, a.field as keyof PesosCliente, v)}
+                              value={row[a.pesoField as keyof PesosCliente] as number}
+                              onChange={v => update(row.nombre_cliente, a.pesoField as keyof PesosCliente, v)}
                               activeColor={a.color}
                             />
-                          </div>
-                        </TableCell>
+                          </TableCell>
+                          <TableCell key={`${a.key}-tiempo`} className="py-1.5">
+                            <TiempoInput
+                              value={row[a.tiempoField as keyof PesosCliente] as number}
+                              onChange={v => update(row.nombre_cliente, a.tiempoField as keyof PesosCliente, v)}
+                            />
+                          </TableCell>
+                        </>
                       ))}
                     </TableRow>
                   );

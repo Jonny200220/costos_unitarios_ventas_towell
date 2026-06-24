@@ -6,6 +6,7 @@ import { getResumen } from '../services/nominaService';
 import type { PesosCliente } from '../types/pesos';
 import type { ResumenRow } from '../types/nomina';
 import { queryKeys } from '../lib/queryKeys';
+import { effectiveWeight } from '../lib/formulaConfig';
 
 export type CostoOCRow = {
   orden_venta: string;
@@ -42,31 +43,33 @@ function calcularCostos(pesos: PesosCliente[], nomina: ResumenRow[]): CostoOCRow
   const getPeso = (cliente: string, field: keyof Omit<PesosCliente, 'nombre_cliente'>): number =>
     pesosMap.get(cliente)?.[field] ?? 1;
 
-  // Cachear pesos por cliente único para evitar lookups repetidos
-  const clientePesos = new Map<string, Omit<PesosCliente, 'nombre_cliente'>>();
+  // Cachear peso efectivo por cliente único (peso × tiempo según FORMULA_MODE)
+  type EW = { admin: number; alm: number; prep: number; emb: number; me: number; fle: number };
+  const clienteEW = new Map<string, EW>();
   OC_MAP.forEach(v => {
-    if (!clientePesos.has(v.nombre_cliente)) {
-      clientePesos.set(v.nombre_cliente, {
-        peso_admin:       getPeso(v.nombre_cliente, 'peso_admin'),
-        peso_almacen:     getPeso(v.nombre_cliente, 'peso_almacen'),
-        peso_preparacion: getPeso(v.nombre_cliente, 'peso_preparacion'),
-        peso_embarque:    getPeso(v.nombre_cliente, 'peso_embarque'),
-        peso_me:          getPeso(v.nombre_cliente, 'peso_me'),
-        peso_fletes:      getPeso(v.nombre_cliente, 'peso_fletes'),
+    const c = v.nombre_cliente;
+    if (!clienteEW.has(c)) {
+      clienteEW.set(c, {
+        admin: effectiveWeight(getPeso(c, 'peso_admin'),       getPeso(c, 'tiempo_admin')),
+        alm:   effectiveWeight(getPeso(c, 'peso_almacen'),     getPeso(c, 'tiempo_almacen')),
+        prep:  effectiveWeight(getPeso(c, 'peso_preparacion'), getPeso(c, 'tiempo_preparacion')),
+        emb:   effectiveWeight(getPeso(c, 'peso_embarque'),    getPeso(c, 'tiempo_embarque')),
+        me:    effectiveWeight(getPeso(c, 'peso_me'),          getPeso(c, 'tiempo_me')),
+        fle:   effectiveWeight(getPeso(c, 'peso_fletes'),      getPeso(c, 'tiempo_fletes')),
       });
     }
   });
 
-  // Primera pasada: denominadores Σ(kg × peso)
+  // Primera pasada: denominadores Σ(kg × peso_efectivo)
   let dAdmin = 0, dAlm = 0, dPrep = 0, dEmb = 0, dMe = 0, dFle = 0;
   OC_MAP.forEach(v => {
-    const p = clientePesos.get(v.nombre_cliente)!;
-    dAdmin += v.kg * p.peso_admin;
-    dAlm   += v.kg * p.peso_almacen;
-    dPrep  += v.kg * p.peso_preparacion;
-    dEmb   += v.kg * p.peso_embarque;
-    dMe    += v.kg * p.peso_me;
-    dFle   += v.kg * p.peso_fletes;
+    const ew = clienteEW.get(v.nombre_cliente)!;
+    dAdmin += v.kg * ew.admin;
+    dAlm   += v.kg * ew.alm;
+    dPrep  += v.kg * ew.prep;
+    dEmb   += v.kg * ew.emb;
+    dMe    += v.kg * ew.me;
+    dFle   += v.kg * ew.fle;
   });
 
   const nom = Object.fromEntries(nomina.map(r => [r.seccion, r.total]));
@@ -75,16 +78,16 @@ function calcularCostos(pesos: PesosCliente[], nomina: ResumenRow[]): CostoOCRow
   const tPrep  = nom['Preparación']    ?? 0;
   const tEmb   = nom['Embarques']      ?? 0;
 
-  // Segunda pasada: cuotas por OC (usa pesos ya cacheados)
+  // Segunda pasada: cuotas por OC (usa pesos efectivos ya cacheados)
   const rows: CostoOCRow[] = [];
   OC_MAP.forEach((v, oc) => {
-    const p = clientePesos.get(v.nombre_cliente)!;
-    const cuota_admin       = dAdmin > 0 ? tAdmin           * p.peso_admin       / dAdmin : 0;
-    const cuota_almacen     = dAlm   > 0 ? tAlm             * p.peso_almacen     / dAlm   : 0;
-    const cuota_preparacion = dPrep  > 0 ? tPrep            * p.peso_preparacion / dPrep  : 0;
-    const cuota_embarque    = dEmb   > 0 ? tEmb             * p.peso_embarque    / dEmb   : 0;
-    const cuota_me          = dMe    > 0 ? TOTAL_ME_GLOBAL  * p.peso_me          / dMe    : 0;
-    const cuota_fletes      = dFle   > 0 ? TOTAL_FLE_GLOBAL * p.peso_fletes      / dFle   : 0;
+    const ew = clienteEW.get(v.nombre_cliente)!;
+    const cuota_admin       = dAdmin > 0 ? tAdmin           * ew.admin / dAdmin : 0;
+    const cuota_almacen     = dAlm   > 0 ? tAlm             * ew.alm   / dAlm   : 0;
+    const cuota_preparacion = dPrep  > 0 ? tPrep            * ew.prep  / dPrep  : 0;
+    const cuota_embarque    = dEmb   > 0 ? tEmb             * ew.emb   / dEmb   : 0;
+    const cuota_me          = dMe    > 0 ? TOTAL_ME_GLOBAL  * ew.me    / dMe    : 0;
+    const cuota_fletes      = dFle   > 0 ? TOTAL_FLE_GLOBAL * ew.fle   / dFle   : 0;
     rows.push({
       orden_venta: oc, nombre_cliente: v.nombre_cliente, kg: v.kg, ventas: v.ventas,
       cuota_admin, cuota_almacen, cuota_preparacion, cuota_embarque, cuota_me, cuota_fletes,
