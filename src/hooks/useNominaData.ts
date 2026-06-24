@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { getNominaDetalle, getPlantillaAsync, getResumen } from '../services/nominaService';
 import type { DetalleRow, PlantillaRow, ResumenRow, Seccion } from '../types/nomina';
+import { queryKeys } from '../lib/queryKeys';
 
 export type NominaDataState = {
   detalle: DetalleRow[];
@@ -10,39 +11,29 @@ export type NominaDataState = {
   error: string | null;
 };
 
+// Con forceMount en todos los tabs, los 4 dashboards que llaman useNominaData()
+// comparten las mismas cache keys — Supabase sólo recibe 3 requests en total.
 export function useNominaData(seccion?: Seccion): NominaDataState {
-  const [state, setState] = useState<NominaDataState>({
-    detalle: [],
-    plantilla: [],
-    resumen: [],
-    loading: true,
-    error: null,
+  const detalle = useQuery({
+    queryKey: queryKeys.nominaDetalle(seccion),
+    queryFn: () => getNominaDetalle(seccion),
   });
 
-  useEffect(() => {
-    let cancelled = false;
+  const plantilla = useQuery({
+    queryKey: queryKeys.nominaPlantilla(seccion),
+    queryFn: () => getPlantillaAsync(seccion),
+  });
 
-    async function load() {
-      setState(s => ({ ...s, loading: true, error: null }));
-      try {
-        const [detalle, plantilla, resumen] = await Promise.all([
-          getNominaDetalle(seccion),
-          getPlantillaAsync(seccion),
-          getResumen(),
-        ]);
-        if (!cancelled) {
-          setState({ detalle, plantilla, resumen, loading: false, error: null });
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setState(s => ({ ...s, loading: false, error: String(e) }));
-        }
-      }
-    }
+  const resumen = useQuery({
+    queryKey: queryKeys.nominaResumen,
+    queryFn: getResumen,
+  });
 
-    load();
-    return () => { cancelled = true; };
-  }, [seccion]);
-
-  return state;
+  return {
+    detalle:  detalle.data  ?? [],
+    plantilla: plantilla.data ?? [],
+    resumen:  resumen.data  ?? [],
+    loading:  detalle.isLoading || plantilla.isLoading || resumen.isLoading,
+    error:    detalle.error?.message ?? plantilla.error?.message ?? resumen.error?.message ?? null,
+  };
 }

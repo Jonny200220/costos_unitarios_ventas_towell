@@ -406,10 +406,10 @@ export default function MaterialEmpaqueDashboard() {
               <BarChart data={byMes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: any) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v: any) => fmt(v)} />
                 <Bar dataKey="me" name="Mat. Empaque" fill="#0ea5e9" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="me" position="top" formatter={(v: number) => `$${(v / 1000).toFixed(1)}k`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="me" position="top" formatter={(v: any) => `$${(v / 1000).toFixed(1)}k`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -425,10 +425,10 @@ export default function MaterialEmpaqueDashboard() {
               <BarChart data={byMes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
-                <Tooltip formatter={(v: number) => `$${v.toFixed(4)}`} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: any) => `$${v.toFixed(2)}`} />
+                <Tooltip formatter={(v: any) => `$${v.toFixed(4)}`} />
                 <Bar dataKey="cuota" name="$/kg" fill="#f59e0b" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="cuota" position="top" formatter={(v: number) => `$${v.toFixed(2)}`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="cuota" position="top" formatter={(v: any) => `$${v.toFixed(2)}`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -450,8 +450,8 @@ export default function MaterialEmpaqueDashboard() {
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="cliente" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: any) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v: any) => fmt(v)} />
                 <Bar dataKey="me" name="Mat. Empaque" fill="#1e2a5e" radius={[4, 4, 0, 0]}>
                   {byCliente.slice(0, 10).map((_, i) => (
                     <rect key={i} fill={COLORS[i % COLORS.length]} />

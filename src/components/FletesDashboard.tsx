@@ -436,13 +436,13 @@ export default function FletesDashboard() {
               <BarChart data={byMes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: any) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v: any) => fmt(v)} />
                 <Bar dataKey="flete" name="Fletes" fill="#1e2a5e" radius={[4, 4, 0, 0]} stackId="a">
-                  <LabelList dataKey="flete" position="inside" formatter={(v: number) => v > 0 ? `$${(v / 1000).toFixed(0)}k` : ''} style={{ fontSize: 9, fill: '#fff' }} />
+                  <LabelList dataKey="flete" position="inside" formatter={(v: any) => v > 0 ? `$${(v / 1000).toFixed(0)}k` : ''} style={{ fontSize: 9, fill: '#fff' }} />
                 </Bar>
                 <Bar dataKey="maniobras" name="Maniobras" fill="#f97316" radius={[4, 4, 0, 0]} stackId="a">
-                  <LabelList dataKey="maniobras" position="top" formatter={(v: number) => v > 0 ? `$${(v / 1000).toFixed(0)}k` : ''} style={{ fontSize: 9 }} />
+                  <LabelList dataKey="maniobras" position="top" formatter={(v: any) => v > 0 ? `$${(v / 1000).toFixed(0)}k` : ''} style={{ fontSize: 9 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -458,10 +458,10 @@ export default function FletesDashboard() {
               <BarChart data={byMes} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${v.toFixed(2)}`} />
-                <Tooltip formatter={(v: number) => `$${v.toFixed(4)}`} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: any) => `$${v.toFixed(2)}`} />
+                <Tooltip formatter={(v: any) => `$${v.toFixed(4)}`} />
                 <Bar dataKey="cuota" name="$/kg" fill="#0ea5e9" radius={[4, 4, 0, 0]}>
-                  <LabelList dataKey="cuota" position="top" formatter={(v: number) => `$${v.toFixed(2)}`} style={{ fontSize: 10 }} />
+                  <LabelList dataKey="cuota" position="top" formatter={(v: any) => `$${v.toFixed(2)}`} style={{ fontSize: 10 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -483,8 +483,8 @@ export default function FletesDashboard() {
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="cliente" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
-                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v: number) => fmt(v)} />
+                <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: any) => `$${(v / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(v: any) => fmt(v)} />
                 <Bar dataKey="flete" name="Fletes" fill="#1e2a5e" stackId="b" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="maniobras" name="Maniobras" fill="#f97316" stackId="b" radius={[4, 4, 0, 0]} />
               </BarChart>

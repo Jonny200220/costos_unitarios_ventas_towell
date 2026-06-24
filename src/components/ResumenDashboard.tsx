@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNominaData } from '../hooks/useNominaData';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -14,6 +15,7 @@ import TablePagination from './TablePagination';
 import { fmtMXN } from '../lib/format';
 import { getPesosCliente } from '../services/pesosService';
 import type { PesosCliente } from '../types/pesos';
+import { queryKeys } from '../lib/queryKeys';
 
 function fmt2(n: number) { return `$${n.toFixed(2)}`; }
 
@@ -37,28 +39,37 @@ const TAMANOS: string[] = ['todos', ...Array.from(new Set(ALL_ROWS.map(r => r.ta
 export default function ResumenDashboard() {
   const { resumen, plantilla: PLANTILLA_ROWS, loading } = useNominaData();
 
-  // ── Pesos por cliente ──────────────────────────────────────────────────────
-  const [pesosMap, setPesosMap] = useState<Map<string, PesosCliente>>(new Map());
-  useEffect(() => {
-    getPesosCliente().then(rows =>
-      setPesosMap(new Map(rows.map(p => [p.nombre_cliente, p])))
-    );
-  }, []);
+  // ── Pesos por cliente — caché compartida con CostosUnitariosDashboard y PesosClientePage ──
+  const { data: pesosArr = [] } = useQuery({
+    queryKey: queryKeys.pesosCliente,
+    queryFn: getPesosCliente,
+  });
+  const pesosMap = useMemo(
+    () => new Map(pesosArr.map((p: PesosCliente) => [p.nombre_cliente, p])),
+    [pesosArr],
+  );
 
-  // ── Nómina totales por sección ─────────────────────────────────────────────
+  // ── Nómina totales ─────────────────────────────────────────────────────────
   const NOMINA_TOTALES = useMemo(
     () => Object.fromEntries(resumen.map(r => [r.seccion, r.total])),
     [resumen],
   );
 
+  // ── Personal por sección — precomputa sueldo unitario por puesto (elimina O(n²) find) ──
   const PERSONAL_POR_SECCION = useMemo(() => {
-    const map: Record<string, { puestos: Record<string, number>; total: number; sueldoTotal: number }> = {};
+    const map: Record<string, {
+      puestos: Record<string, number>;
+      sueldoUnits: Record<string, number>;
+      total: number;
+      sueldoTotal: number;
+    }> = {};
     PLANTILLA_ROWS.forEach(r => {
-      const sec = r.seccion;
+      const sec    = r.seccion;
       const subsec = r.subseccion?.trim();
       const puesto = subsec ? `${subsec} — ${r.puesto || '(Sin puesto)'}` : r.puesto || '(Sin puesto)';
-      if (!map[sec]) map[sec] = { puestos: {}, total: 0, sueldoTotal: 0 };
+      if (!map[sec]) map[sec] = { puestos: {}, sueldoUnits: {}, total: 0, sueldoTotal: 0 };
       map[sec].puestos[puesto] = (map[sec].puestos[puesto] || 0) + 1;
+      if (!map[sec].sueldoUnits[puesto]) map[sec].sueldoUnits[puesto] = r.sueldoMensual;
       map[sec].total += 1;
       map[sec].sueldoTotal += r.sueldoMensual;
     });
@@ -72,16 +83,16 @@ export default function ResumenDashboard() {
   );
 
   // ── UI state ───────────────────────────────────────────────────────────────
-  const [search, setSearch]         = useState('');
-  const [sortKey, setSortKey]       = useState<SortKey>('ventas');
-  const [sortAsc, setSortAsc]       = useState(false);
-  const [viewMode, setViewMode]     = useState<'cliente' | 'articulo'>('cliente');
+  const [search, setSearch]             = useState('');
+  const [sortKey, setSortKey]           = useState<SortKey>('ventas');
+  const [sortAsc, setSortAsc]           = useState(false);
+  const [viewMode, setViewMode]         = useState<'cliente' | 'articulo'>('cliente');
   const [filtroTamano, setFiltroTamano] = useState('todos');
-  const [mesFilter, setMesFilter]   = useState('todos');
+  const [mesFilter, setMesFilter]       = useState('todos');
 
-  // ── Rows filtradas por mes ──────────────────────────────────────────────────
-  const filteredRows = useMemo(() =>
-    mesFilter === 'todos' ? ALL_ROWS : ALL_ROWS.filter(r => r.mes === mesFilter),
+  // ── Rows filtradas por mes ─────────────────────────────────────────────────
+  const filteredRows = useMemo(
+    () => mesFilter === 'todos' ? ALL_ROWS : ALL_ROWS.filter(r => r.mes === mesFilter),
     [mesFilter],
   );
 
@@ -101,14 +112,12 @@ export default function ResumenDashboard() {
     const getPeso = (cliente: string, field: keyof Omit<PesosCliente, 'nombre_cliente'>): number =>
       pesosMap.get(cliente)?.[field] ?? 1;
 
-    // Kg total por cliente (para calcular denominadores)
     const clienteKg: Record<string, number> = {};
     filteredRows.forEach(r => {
       clienteKg[r.nombre_cliente] = (clienteKg[r.nombre_cliente] ?? 0) + r.peso_std;
     });
     const clientes = Object.keys(clienteKg);
 
-    // Denominadores: Σ (kg_cliente × peso_area_cliente)
     const tAdmin = NOMINA_TOTALES['Administración'] ?? 0;
     const tAlm   = NOMINA_TOTALES['Almacén']        ?? 0;
     const tPrep  = NOMINA_TOTALES['Preparación']    ?? 0;
@@ -125,20 +134,18 @@ export default function ResumenDashboard() {
       dFle   += kg * getPeso(c, 'peso_fletes');
     });
 
-    // Cuota $/kg por cliente para cada área
     const cuotaCliente: Record<string, { admin: number; alm: number; prep: number; emb: number; me: number; fle: number }> = {};
     clientes.forEach(c => {
       cuotaCliente[c] = {
-        admin: dAdmin > 0 ? tAdmin * getPeso(c, 'peso_admin')       / dAdmin : 0,
-        alm:   dAlm   > 0 ? tAlm   * getPeso(c, 'peso_almacen')     / dAlm   : 0,
-        prep:  dPrep  > 0 ? tPrep  * getPeso(c, 'peso_preparacion') / dPrep  : 0,
-        emb:   dEmb   > 0 ? tEmb   * getPeso(c, 'peso_embarque')    / dEmb   : 0,
-        me:    dMe    > 0 ? TOTAL_ME    * getPeso(c, 'peso_me')      / dMe    : 0,
-        fle:   dFle   > 0 ? TOTAL_FLETE * getPeso(c, 'peso_fletes') / dFle   : 0,
+        admin: dAdmin > 0 ? tAdmin       * getPeso(c, 'peso_admin')       / dAdmin : 0,
+        alm:   dAlm   > 0 ? tAlm         * getPeso(c, 'peso_almacen')     / dAlm   : 0,
+        prep:  dPrep  > 0 ? tPrep        * getPeso(c, 'peso_preparacion') / dPrep  : 0,
+        emb:   dEmb   > 0 ? tEmb         * getPeso(c, 'peso_embarque')    / dEmb   : 0,
+        me:    dMe    > 0 ? TOTAL_ME     * getPeso(c, 'peso_me')          / dMe    : 0,
+        fle:   dFle   > 0 ? TOTAL_FLETE  * getPeso(c, 'peso_fletes')      / dFle   : 0,
       };
     });
 
-    // Agrupar por cliente o artículo, acumulando cuotas ponderadas por kg
     const rowKey = viewMode === 'cliente' ? 'nombre_cliente' : 'nombre_articulo';
     const map: Record<string, {
       ventas: number; kg: number;
@@ -147,10 +154,10 @@ export default function ResumenDashboard() {
 
     filteredRows.forEach(r => {
       if (filtroTamano !== 'todos' && r.tamano !== filtroTamano) return;
-      const k   = r[rowKey];
-      const c   = r.nombre_cliente;
-      const cu  = cuotaCliente[c] ?? { admin: 0, alm: 0, prep: 0, emb: 0, me: 0, fle: 0 };
-      const kg  = r.peso_std;
+      const k  = r[rowKey];
+      const c  = r.nombre_cliente;
+      const cu = cuotaCliente[c] ?? { admin: 0, alm: 0, prep: 0, emb: 0, me: 0, fle: 0 };
+      const kg = r.peso_std;
       if (!map[k]) map[k] = { ventas: 0, kg: 0, adminKg: 0, almKg: 0, prepKg: 0, embKg: 0, meKg: 0, fleKg: 0 };
       map[k].ventas  += r.importe;
       map[k].kg      += kg;
@@ -175,10 +182,10 @@ export default function ResumenDashboard() {
         cuotaFlete: v.kg > 0 ? v.fleKg   / v.kg : 0,
       }))
       .sort((a, b) => b.ventas - a.ventas);
-  }, [viewMode, filtroTamano, mesFilter, filteredRows, NOMINA_TOTALES, TOTAL_ME, TOTAL_FLETE, pesosMap]);
+  }, [viewMode, filtroTamano, filteredRows, NOMINA_TOTALES, TOTAL_ME, TOTAL_FLETE, pesosMap]);
 
   const data = useMemo(() => {
-    const s = search.toLowerCase();
+    const s        = search.toLowerCase();
     const filtered = s ? baseRows.filter(r => r.label.toLowerCase().includes(s)) : baseRows;
     return [...filtered].sort((a, b) => {
       const va = a[sortKey], vb = b[sortKey];
@@ -187,6 +194,27 @@ export default function ResumenDashboard() {
       return sortAsc ? (va as number) - (vb as number) : (vb as number) - (va as number);
     });
   }, [search, sortKey, sortAsc, baseRows]);
+
+  // ── Footer: promedios ponderados en un solo pase ───────────────────────────
+  const footerTotals = useMemo(() => {
+    let totalKg = 0, admin = 0, alm = 0, prep = 0, emb = 0, me = 0, flete = 0;
+    for (const r of data) {
+      totalKg += r.peso;
+      admin   += r.cuotaAdmin  * r.peso;
+      alm     += r.cuotaAlm    * r.peso;
+      prep    += r.cuotaPrep   * r.peso;
+      emb     += r.cuotaEmb    * r.peso;
+      me      += r.cuotaMe     * r.peso;
+      flete   += r.cuotaFlete  * r.peso;
+    }
+    if (totalKg === 0) return { admin: 0, alm: 0, prep: 0, emb: 0, me: 0, flete: 0, totalKg: 0, totalVentas: 0 };
+    const totalVentas = data.reduce((s, r) => s + r.ventas, 0);
+    return {
+      admin: admin / totalKg, alm: alm / totalKg, prep: prep / totalKg,
+      emb: emb / totalKg, me: me / totalKg, flete: flete / totalKg,
+      totalKg, totalVentas,
+    };
+  }, [data]);
 
   function handleViewMode(mode: 'cliente' | 'articulo') { setViewMode(mode); setSearch(''); }
   function handleTamano(t: string) { setFiltroTamano(t); setSearch(''); }
@@ -199,15 +227,8 @@ export default function ResumenDashboard() {
     return <span className="ml-1">{sortAsc ? '↑' : '↓'}</span>;
   }
 
-  const pag = usePagination(data, 15);
+  const pag      = usePagination(data, 15);
   const colLabel = viewMode === 'cliente' ? 'Cliente' : 'Artículo';
-
-  // Promedio ponderado del conjunto visible (para footer)
-  const footerAvg = (key: keyof ItemResumen) => {
-    const totalKg = data.reduce((s, r) => s + r.peso, 0);
-    if (totalKg === 0) return 0;
-    return data.reduce((s, r) => s + (r[key] as number) * r.peso, 0) / totalKg;
-  };
 
   if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando datos...</div>;
 
@@ -247,13 +268,9 @@ export default function ResumenDashboard() {
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm text-muted-foreground font-medium">Mes:</span>
         {['todos', ...MESES].map(m => (
-          <button
-            key={m}
-            onClick={() => setMesFilter(m)}
+          <button key={m} onClick={() => setMesFilter(m)}
             className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
-              mesFilter === m
-                ? 'bg-[#1e2a5e] text-white'
-                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              mesFilter === m ? 'bg-[#1e2a5e] text-white' : 'bg-muted text-muted-foreground hover:bg-muted/80'
             }`}
           >
             {m === 'todos' ? 'Todos' : m}
@@ -300,14 +317,14 @@ export default function ResumenDashboard() {
                   onClick={() => toggleSort('label')}>
                   {colLabel} <SortIcon k="label" />
                 </TableHead>
-                <TableHead className={`${thC} sticky top-0 bg-[#1e2a5e]`} onClick={() => toggleSort('ventas')}>Ventas <SortIcon k="ventas" /></TableHead>
+                <TableHead className={`${thC} sticky top-0 bg-[#1e2a5e]`}          onClick={() => toggleSort('ventas')}>Ventas <SortIcon k="ventas" /></TableHead>
                 <TableHead className="text-white font-semibold text-right whitespace-nowrap text-xs py-2 sticky top-0 bg-[#1e2a5e]">Kg</TableHead>
-                <TableHead className={`${thC} bg-amber-900/50 sticky top-0`}   onClick={() => toggleSort('cuotaAdmin')}>Admin $/kg <SortIcon k="cuotaAdmin" /></TableHead>
-                <TableHead className={`${thC} bg-teal-900/50 sticky top-0`}    onClick={() => toggleSort('cuotaAlm')}>Almacén $/kg <SortIcon k="cuotaAlm" /></TableHead>
-                <TableHead className={`${thC} bg-emerald-900/50 sticky top-0`} onClick={() => toggleSort('cuotaPrep')}>Prep. $/kg <SortIcon k="cuotaPrep" /></TableHead>
-                <TableHead className={`${thC} bg-purple-900/50 sticky top-0`}  onClick={() => toggleSort('cuotaEmb')}>Embarques $/kg <SortIcon k="cuotaEmb" /></TableHead>
-                <TableHead className={`${thC} bg-blue-900/50 sticky top-0`}    onClick={() => toggleSort('cuotaMe')}>ME $/kg <SortIcon k="cuotaMe" /></TableHead>
-                <TableHead className={`${thC} bg-indigo-900/50 sticky top-0`}  onClick={() => toggleSort('cuotaFlete')}>Flete $/kg <SortIcon k="cuotaFlete" /></TableHead>
+                <TableHead className={`${thC} bg-amber-900/50 sticky top-0`}        onClick={() => toggleSort('cuotaAdmin')}>Admin $/kg <SortIcon k="cuotaAdmin" /></TableHead>
+                <TableHead className={`${thC} bg-teal-900/50 sticky top-0`}         onClick={() => toggleSort('cuotaAlm')}>Almacén $/kg <SortIcon k="cuotaAlm" /></TableHead>
+                <TableHead className={`${thC} bg-emerald-900/50 sticky top-0`}      onClick={() => toggleSort('cuotaPrep')}>Prep. $/kg <SortIcon k="cuotaPrep" /></TableHead>
+                <TableHead className={`${thC} bg-purple-900/50 sticky top-0`}       onClick={() => toggleSort('cuotaEmb')}>Embarques $/kg <SortIcon k="cuotaEmb" /></TableHead>
+                <TableHead className={`${thC} bg-blue-900/50 sticky top-0`}         onClick={() => toggleSort('cuotaMe')}>ME $/kg <SortIcon k="cuotaMe" /></TableHead>
+                <TableHead className={`${thC} bg-indigo-900/50 sticky top-0`}       onClick={() => toggleSort('cuotaFlete')}>Flete $/kg <SortIcon k="cuotaFlete" /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -328,14 +345,14 @@ export default function ResumenDashboard() {
             <TableFooter>
               <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
                 <TableCell>TOTAL ({data.length} {colLabel.toLowerCase()}s)</TableCell>
-                <TableCell className="text-right">{fmtMXN(data.reduce((s, r) => s + r.ventas, 0))}</TableCell>
-                <TableCell className="text-right">{data.reduce((s, r) => s + r.peso, 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}</TableCell>
-                <TableCell className="text-right">{fmt2(footerAvg('cuotaAdmin'))}</TableCell>
-                <TableCell className="text-right">{fmt2(footerAvg('cuotaAlm'))}</TableCell>
-                <TableCell className="text-right">{fmt2(footerAvg('cuotaPrep'))}</TableCell>
-                <TableCell className="text-right">{fmt2(footerAvg('cuotaEmb'))}</TableCell>
-                <TableCell className="text-right">{fmt2(footerAvg('cuotaMe'))}</TableCell>
-                <TableCell className="text-right">{fmt2(footerAvg('cuotaFlete'))}</TableCell>
+                <TableCell className="text-right">{fmtMXN(footerTotals.totalVentas)}</TableCell>
+                <TableCell className="text-right">{footerTotals.totalKg.toLocaleString('es-MX', { maximumFractionDigits: 0 })}</TableCell>
+                <TableCell className="text-right">{fmt2(footerTotals.admin)}</TableCell>
+                <TableCell className="text-right">{fmt2(footerTotals.alm)}</TableCell>
+                <TableCell className="text-right">{fmt2(footerTotals.prep)}</TableCell>
+                <TableCell className="text-right">{fmt2(footerTotals.emb)}</TableCell>
+                <TableCell className="text-right">{fmt2(footerTotals.me)}</TableCell>
+                <TableCell className="text-right">{fmt2(footerTotals.flete)}</TableCell>
               </TableRow>
             </TableFooter>
           </Table>
@@ -360,12 +377,7 @@ export default function ResumenDashboard() {
             <TableBody>
               {Object.entries(PERSONAL_POR_SECCION).map(([seccion, secData]) =>
                 Object.entries(secData.puestos).map(([puesto, count], j) => {
-                  const sueldoUnit = PLANTILLA_ROWS.find(r => {
-                    const subsec = r.subseccion?.trim();
-                    const key = subsec ? `${subsec} — ${r.puesto || '(Sin puesto)'}` : r.puesto || '(Sin puesto)';
-                    return r.seccion === seccion && key === puesto;
-                  });
-                  const sueldoUnitVal = sueldoUnit?.sueldoMensual ?? 0;
+                  const sueldoUnitVal = secData.sueldoUnits[puesto] ?? 0;
                   return (
                     <TableRow key={`${seccion}-${puesto}`} className={j === 0 ? 'border-t-2 border-foreground/10' : ''}>
                       <TableCell className={`font-medium ${j === 0 ? '' : 'text-transparent'}`}>{j === 0 ? seccion : ''}</TableCell>

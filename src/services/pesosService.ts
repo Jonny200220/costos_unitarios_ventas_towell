@@ -3,15 +3,13 @@ import type { PesosCliente } from '../types/pesos';
 import { DEFAULT_PESOS } from '../types/pesos';
 import { ALL_ROWS } from '../hooks/useSalesData';
 
-// Lista de clientes únicos derivada del CSV de ventas
-function getClientesFromVentas(): string[] {
-  const set = new Set<string>();
-  ALL_ROWS.forEach(r => { if (r.nombre_cliente) set.add(r.nombre_cliente); });
-  return Array.from(set).sort();
-}
+// Calculado una sola vez al cargar el módulo — compartido por todos los consumidores
+const CLIENTES: string[] = Array.from(
+  new Set(ALL_ROWS.filter(r => r.nombre_cliente).map(r => r.nombre_cliente))
+).sort();
 
 export function getClientes(): string[] {
-  return getClientesFromVentas();
+  return CLIENTES;
 }
 
 export async function getPesosCliente(): Promise<PesosCliente[]> {
@@ -34,8 +32,7 @@ export async function getPesosCliente(): Promise<PesosCliente[]> {
     console.warn('pesosService: fallback defaults', error?.message);
   }
 
-  // Un registro por cliente: guardado si existe, default (1) si no
-  return getClientesFromVentas().map(nombre_cliente =>
+  return CLIENTES.map(nombre_cliente =>
     savedMap.get(nombre_cliente) ?? { nombre_cliente, ...DEFAULT_PESOS }
   );
 }

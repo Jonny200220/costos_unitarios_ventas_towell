@@ -1,9 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { ALL_ROWS } from './useSalesData';
 import { getPesosCliente } from '../services/pesosService';
 import { getResumen } from '../services/nominaService';
 import type { PesosCliente } from '../types/pesos';
 import type { ResumenRow } from '../types/nomina';
+import { queryKeys } from '../lib/queryKeys';
 
 export type CostoOCRow = {
   orden_venta: string;
@@ -19,12 +21,10 @@ export type CostoOCRow = {
   cuota_total: number;
 };
 
-// ─── Totales globales (calculados una sola vez al cargar el módulo) ───────────
+// ─── Agregados de módulo (calculados una sola vez) ────────────────────────────
 
 const TOTAL_ME_GLOBAL  = ALL_ROWS.reduce((s, r) => s + r.monto_me,  0);
 const TOTAL_FLE_GLOBAL = ALL_ROWS.reduce((s, r) => s + r.monto_fle, 0);
-
-// ─── Agregado por OC (calculado una sola vez) ─────────────────────────────────
 
 type OCData = { nombre_cliente: string; kg: number; ventas: number };
 const OC_MAP = new Map<string, OCData>();
@@ -35,24 +35,38 @@ ALL_ROWS.forEach(r => {
   else OC_MAP.set(r.orden_venta, { nombre_cliente: r.nombre_cliente, kg: r.peso_std, ventas: r.importe });
 });
 
-// ─── Cálculo ponderado por cliente ────────────────────────────────────────────
+// ─── Cálculo ponderado ────────────────────────────────────────────────────────
 
 function calcularCostos(pesos: PesosCliente[], nomina: ResumenRow[]): CostoOCRow[] {
-  // Mapa cliente → pesos
   const pesosMap = new Map(pesos.map(p => [p.nombre_cliente, p]));
   const getPeso = (cliente: string, field: keyof Omit<PesosCliente, 'nombre_cliente'>): number =>
     pesosMap.get(cliente)?.[field] ?? 1;
 
-  // Denominador por área = Σ (kg_OC × peso_cliente_de_OC)
+  // Cachear pesos por cliente único para evitar lookups repetidos
+  const clientePesos = new Map<string, Omit<PesosCliente, 'nombre_cliente'>>();
+  OC_MAP.forEach(v => {
+    if (!clientePesos.has(v.nombre_cliente)) {
+      clientePesos.set(v.nombre_cliente, {
+        peso_admin:       getPeso(v.nombre_cliente, 'peso_admin'),
+        peso_almacen:     getPeso(v.nombre_cliente, 'peso_almacen'),
+        peso_preparacion: getPeso(v.nombre_cliente, 'peso_preparacion'),
+        peso_embarque:    getPeso(v.nombre_cliente, 'peso_embarque'),
+        peso_me:          getPeso(v.nombre_cliente, 'peso_me'),
+        peso_fletes:      getPeso(v.nombre_cliente, 'peso_fletes'),
+      });
+    }
+  });
+
+  // Primera pasada: denominadores Σ(kg × peso)
   let dAdmin = 0, dAlm = 0, dPrep = 0, dEmb = 0, dMe = 0, dFle = 0;
-  OC_MAP.forEach((v) => {
-    const c = v.nombre_cliente;
-    dAdmin += v.kg * getPeso(c, 'peso_admin');
-    dAlm   += v.kg * getPeso(c, 'peso_almacen');
-    dPrep  += v.kg * getPeso(c, 'peso_preparacion');
-    dEmb   += v.kg * getPeso(c, 'peso_embarque');
-    dMe    += v.kg * getPeso(c, 'peso_me');
-    dFle   += v.kg * getPeso(c, 'peso_fletes');
+  OC_MAP.forEach(v => {
+    const p = clientePesos.get(v.nombre_cliente)!;
+    dAdmin += v.kg * p.peso_admin;
+    dAlm   += v.kg * p.peso_almacen;
+    dPrep  += v.kg * p.peso_preparacion;
+    dEmb   += v.kg * p.peso_embarque;
+    dMe    += v.kg * p.peso_me;
+    dFle   += v.kg * p.peso_fletes;
   });
 
   const nom = Object.fromEntries(nomina.map(r => [r.seccion, r.total]));
@@ -61,26 +75,18 @@ function calcularCostos(pesos: PesosCliente[], nomina: ResumenRow[]): CostoOCRow
   const tPrep  = nom['Preparación']    ?? 0;
   const tEmb   = nom['Embarques']      ?? 0;
 
+  // Segunda pasada: cuotas por OC (usa pesos ya cacheados)
   const rows: CostoOCRow[] = [];
   OC_MAP.forEach((v, oc) => {
-    const c  = v.nombre_cliente;
-    const pA = getPeso(c, 'peso_admin');
-    const pL = getPeso(c, 'peso_almacen');
-    const pP = getPeso(c, 'peso_preparacion');
-    const pE = getPeso(c, 'peso_embarque');
-    const pM = getPeso(c, 'peso_me');
-    const pF = getPeso(c, 'peso_fletes');
-
-    // Cuota $/kg = Costo total área × peso_cliente / denominador
-    const cuota_admin       = dAdmin > 0 ? tAdmin           * pA / dAdmin : 0;
-    const cuota_almacen     = dAlm   > 0 ? tAlm             * pL / dAlm   : 0;
-    const cuota_preparacion = dPrep  > 0 ? tPrep            * pP / dPrep  : 0;
-    const cuota_embarque    = dEmb   > 0 ? tEmb             * pE / dEmb   : 0;
-    const cuota_me          = dMe    > 0 ? TOTAL_ME_GLOBAL  * pM / dMe    : 0;
-    const cuota_fletes      = dFle   > 0 ? TOTAL_FLE_GLOBAL * pF / dFle   : 0;
-
+    const p = clientePesos.get(v.nombre_cliente)!;
+    const cuota_admin       = dAdmin > 0 ? tAdmin           * p.peso_admin       / dAdmin : 0;
+    const cuota_almacen     = dAlm   > 0 ? tAlm             * p.peso_almacen     / dAlm   : 0;
+    const cuota_preparacion = dPrep  > 0 ? tPrep            * p.peso_preparacion / dPrep  : 0;
+    const cuota_embarque    = dEmb   > 0 ? tEmb             * p.peso_embarque    / dEmb   : 0;
+    const cuota_me          = dMe    > 0 ? TOTAL_ME_GLOBAL  * p.peso_me          / dMe    : 0;
+    const cuota_fletes      = dFle   > 0 ? TOTAL_FLE_GLOBAL * p.peso_fletes      / dFle   : 0;
     rows.push({
-      orden_venta: oc, nombre_cliente: c, kg: v.kg, ventas: v.ventas,
+      orden_venta: oc, nombre_cliente: v.nombre_cliente, kg: v.kg, ventas: v.ventas,
       cuota_admin, cuota_almacen, cuota_preparacion, cuota_embarque, cuota_me, cuota_fletes,
       cuota_total: cuota_admin + cuota_almacen + cuota_preparacion + cuota_embarque + cuota_me + cuota_fletes,
     });
@@ -92,28 +98,21 @@ function calcularCostos(pesos: PesosCliente[], nomina: ResumenRow[]): CostoOCRow
 // ─── Hook público ─────────────────────────────────────────────────────────────
 
 export function useCostosUnitarios() {
-  const [pesos, setPesos]     = useState<PesosCliente[]>([]);
-  const [nomina, setNomina]   = useState<ResumenRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
+  const { data: pesos = [], isLoading: loadingPesos, error: errPesos } = useQuery({
+    queryKey: queryKeys.pesosCliente,
+    queryFn: getPesosCliente,
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      try {
-        const [p, n] = await Promise.all([getPesosCliente(), getResumen()]);
-        if (!cancelled) { setPesos(p); setNomina(n); }
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
+  const { data: nomina = [], isLoading: loadingNomina, error: errNomina } = useQuery({
+    queryKey: queryKeys.nominaResumen,
+    queryFn: getResumen,
+  });
 
   const rows = useMemo(() => calcularCostos(pesos, nomina), [pesos, nomina]);
-  return { rows, loading, error };
+
+  return {
+    rows,
+    loading: loadingPesos || loadingNomina,
+    error: errPesos?.message ?? errNomina?.message ?? null,
+  };
 }
