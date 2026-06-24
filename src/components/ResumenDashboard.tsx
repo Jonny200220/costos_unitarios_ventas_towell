@@ -31,11 +31,8 @@ type ItemResumen = {
 
 type SortKey = 'label' | 'ventas' | 'cuotaAdmin' | 'cuotaAlm' | 'cuotaPrep' | 'cuotaEmb' | 'cuotaMe' | 'cuotaFlete';
 
+const MESES = ['Ene', 'Feb', 'Mar', 'Abr'];
 const TAMANOS: string[] = ['todos', ...Array.from(new Set(ALL_ROWS.map(r => r.tamano).filter(Boolean))).sort()];
-const TOTAL_PESO   = ALL_ROWS.reduce((s, r) => s + r.peso_std,  0);
-const TOTAL_VENTAS = ALL_ROWS.reduce((s, r) => s + r.importe,   0);
-const TOTAL_ME     = ALL_ROWS.reduce((s, r) => s + r.monto_me,  0);
-const TOTAL_FLETE  = ALL_ROWS.reduce((s, r) => s + r.monto_fle, 0);
 
 export default function ResumenDashboard() {
   const { resumen, plantilla: PLANTILLA_ROWS, loading } = useNominaData();
@@ -74,18 +71,30 @@ export default function ResumenDashboard() {
     [PLANTILLA_ROWS],
   );
 
-  // Cuotas planas para KPI cards (promedio global)
-  const CUOTA_ADMIN = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Administración'] ?? 0) / TOTAL_PESO : 0;
-  const CUOTA_PREP  = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Preparación']    ?? 0) / TOTAL_PESO : 0;
-  const CUOTA_ALM   = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Almacén']        ?? 0) / TOTAL_PESO : 0;
-  const CUOTA_EMB   = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Embarques']      ?? 0) / TOTAL_PESO : 0;
-
   // ── UI state ───────────────────────────────────────────────────────────────
   const [search, setSearch]         = useState('');
   const [sortKey, setSortKey]       = useState<SortKey>('ventas');
   const [sortAsc, setSortAsc]       = useState(false);
   const [viewMode, setViewMode]     = useState<'cliente' | 'articulo'>('cliente');
   const [filtroTamano, setFiltroTamano] = useState('todos');
+  const [mesFilter, setMesFilter]   = useState('todos');
+
+  // ── Rows filtradas por mes ──────────────────────────────────────────────────
+  const filteredRows = useMemo(() =>
+    mesFilter === 'todos' ? ALL_ROWS : ALL_ROWS.filter(r => r.mes === mesFilter),
+    [mesFilter],
+  );
+
+  const TOTAL_PESO   = useMemo(() => filteredRows.reduce((s, r) => s + r.peso_std,  0), [filteredRows]);
+  const TOTAL_VENTAS = useMemo(() => filteredRows.reduce((s, r) => s + r.importe,   0), [filteredRows]);
+  const TOTAL_ME     = useMemo(() => filteredRows.reduce((s, r) => s + r.monto_me,  0), [filteredRows]);
+  const TOTAL_FLETE  = useMemo(() => filteredRows.reduce((s, r) => s + r.monto_fle, 0), [filteredRows]);
+
+  // Cuotas planas para KPI cards
+  const CUOTA_ADMIN = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Administración'] ?? 0) / TOTAL_PESO : 0;
+  const CUOTA_PREP  = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Preparación']    ?? 0) / TOTAL_PESO : 0;
+  const CUOTA_ALM   = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Almacén']        ?? 0) / TOTAL_PESO : 0;
+  const CUOTA_EMB   = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Embarques']      ?? 0) / TOTAL_PESO : 0;
 
   // ── Cálculo ponderado por cliente ──────────────────────────────────────────
   const baseRows = useMemo<ItemResumen[]>(() => {
@@ -94,7 +103,7 @@ export default function ResumenDashboard() {
 
     // Kg total por cliente (para calcular denominadores)
     const clienteKg: Record<string, number> = {};
-    ALL_ROWS.forEach(r => {
+    filteredRows.forEach(r => {
       clienteKg[r.nombre_cliente] = (clienteKg[r.nombre_cliente] ?? 0) + r.peso_std;
     });
     const clientes = Object.keys(clienteKg);
@@ -136,7 +145,7 @@ export default function ResumenDashboard() {
       adminKg: number; almKg: number; prepKg: number; embKg: number; meKg: number; fleKg: number;
     }> = {};
 
-    ALL_ROWS.forEach(r => {
+    filteredRows.forEach(r => {
       if (filtroTamano !== 'todos' && r.tamano !== filtroTamano) return;
       const k   = r[rowKey];
       const c   = r.nombre_cliente;
@@ -166,7 +175,7 @@ export default function ResumenDashboard() {
         cuotaFlete: v.kg > 0 ? v.fleKg   / v.kg : 0,
       }))
       .sort((a, b) => b.ventas - a.ventas);
-  }, [viewMode, filtroTamano, NOMINA_TOTALES, pesosMap]);
+  }, [viewMode, filtroTamano, mesFilter, filteredRows, NOMINA_TOTALES, TOTAL_ME, TOTAL_FLETE, pesosMap]);
 
   const data = useMemo(() => {
     const s = search.toLowerCase();
@@ -231,6 +240,24 @@ export default function ResumenDashboard() {
               <div className="text-xs text-muted-foreground mt-1">{fmtMXN(total)} total</div>
             </CardContent>
           </Card>
+        ))}
+      </div>
+
+      {/* Filtro mes */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm text-muted-foreground font-medium">Mes:</span>
+        {['todos', ...MESES].map(m => (
+          <button
+            key={m}
+            onClick={() => setMesFilter(m)}
+            className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
+              mesFilter === m
+                ? 'bg-[#1e2a5e] text-white'
+                : 'bg-muted text-muted-foreground hover:bg-muted/80'
+            }`}
+          >
+            {m === 'todos' ? 'Todos' : m}
+          </button>
         ))}
       </div>
 

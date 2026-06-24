@@ -24,10 +24,16 @@ const MESES = ['Ene', 'Feb', 'Mar', 'Abr'];
 export default function FletesDashboard() {
   const [mesFilter, setMesFilter] = useState<string>('todos');
   const [clienteFilter, setClienteFilter] = useState<string>('todos');
+  const [tamanoFilter, setTamanoFilter] = useState<string>('todos');
   const [search, setSearch] = useState<string>('');
 
   const clientes = useMemo(() =>
     Array.from(new Set(VENTAS_ROWS.map(r => r.nombre_cliente))).sort(),
+    [],
+  );
+
+  const tamanos = useMemo(() =>
+    Array.from(new Set(VENTAS_ROWS.map(r => r.tamano).filter(Boolean))).sort(),
     [],
   );
 
@@ -36,16 +42,18 @@ export default function FletesDashboard() {
     return VENTAS_ROWS.filter(r => {
       if (mesFilter !== 'todos' && r.mes !== mesFilter) return false;
       if (clienteFilter !== 'todos' && r.nombre_cliente !== clienteFilter) return false;
+      if (tamanoFilter !== 'todos' && r.tamano !== tamanoFilter) return false;
       if (s && ![r.nombre_cliente, r.nombre_articulo, r.codigo_articulo].join(' ').toLowerCase().includes(s)) return false;
       return true;
     });
-  }, [mesFilter, clienteFilter, search]);
+  }, [mesFilter, clienteFilter, tamanoFilter, search]);
 
-  const hayFiltros = mesFilter !== 'todos' || clienteFilter !== 'todos' || search !== '';
+  const hayFiltros = mesFilter !== 'todos' || clienteFilter !== 'todos' || tamanoFilter !== 'todos' || search !== '';
 
   function resetFiltros() {
     setMesFilter('todos');
     setClienteFilter('todos');
+    setTamanoFilter('todos');
     setSearch('');
   }
 
@@ -118,6 +126,15 @@ export default function FletesDashboard() {
             className="pl-8 h-9"
           />
         </div>
+        <Select value={mesFilter} onValueChange={setMesFilter}>
+          <SelectTrigger className="w-32 h-9">
+            <SelectValue placeholder="Mes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos los meses</SelectItem>
+            {MESES.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Select value={clienteFilter} onValueChange={setClienteFilter}>
           <SelectTrigger className="w-52 h-9">
             <SelectValue placeholder="Cliente" />
@@ -125,6 +142,15 @@ export default function FletesDashboard() {
           <SelectContent>
             <SelectItem value="todos">Todos los clientes</SelectItem>
             {clientes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={tamanoFilter} onValueChange={setTamanoFilter}>
+          <SelectTrigger className="w-32 h-9">
+            <SelectValue placeholder="Tamaño" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos los tamaños</SelectItem>
+            {tamanos.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
           </SelectContent>
         </Select>
         {hayFiltros && (
@@ -466,6 +492,79 @@ export default function FletesDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Resumen por mes */}
+      <Card className="border-0 shadow-sm ring-1 ring-foreground/10">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold">Resumen Fletes y Maniobras por Mes</CardTitle>
+        </CardHeader>
+        <CardContent className="overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
+                <TableHead className="text-white font-semibold">Concepto</TableHead>
+                <TableHead className="text-white font-semibold text-right">Enero</TableHead>
+                <TableHead className="text-white font-semibold text-right">Febrero</TableHead>
+                <TableHead className="text-white font-semibold text-right">Marzo</TableHead>
+                <TableHead className="text-white font-semibold text-right">Abril</TableHead>
+                <TableHead className="text-white font-semibold text-right">Total</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="font-medium">Fletes</TableCell>
+                {byMes.map(m => (
+                  <TableCell key={m.mes} className="text-right">{fmt(m.flete)}</TableCell>
+                ))}
+                <TableCell className="text-right font-semibold text-[#1e2a5e]">{fmt(byMes.reduce((s, m) => s + m.flete, 0))}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Maniobras</TableCell>
+                {byMes.map(m => (
+                  <TableCell key={m.mes} className="text-right">{fmt(m.maniobras)}</TableCell>
+                ))}
+                <TableCell className="text-right font-semibold text-orange-500">{fmt(byMes.reduce((s, m) => s + m.maniobras, 0))}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Total Logística</TableCell>
+                {byMes.map(m => (
+                  <TableCell key={m.mes} className="text-right font-semibold">{fmt(m.total)}</TableCell>
+                ))}
+                <TableCell className="text-right font-semibold text-emerald-600">{fmt(byMes.reduce((s, m) => s + m.total, 0))}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Kg Vendidos</TableCell>
+                {byMes.map(m => (
+                  <TableCell key={m.mes} className="text-right text-muted-foreground">{m.kg.toLocaleString('es-MX', { maximumFractionDigits: 0 })}</TableCell>
+                ))}
+                <TableCell className="text-right text-muted-foreground">{byMes.reduce((s, m) => s + m.kg, 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Cuota Flete ($/kg)</TableCell>
+                {byMes.map(m => (
+                  <TableCell key={m.mes} className="text-right font-semibold text-sky-600">{m.kg > 0 ? `$${(m.flete / m.kg).toFixed(4)}` : '—'}</TableCell>
+                ))}
+                <TableCell className="text-right font-semibold text-sky-600">
+                  {byMes.reduce((s, m) => s + m.kg, 0) > 0
+                    ? `$${(byMes.reduce((s, m) => s + m.flete, 0) / byMes.reduce((s, m) => s + m.kg, 0)).toFixed(4)}`
+                    : '—'}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="font-medium">Cuota Maniobras ($/kg)</TableCell>
+                {byMes.map(m => (
+                  <TableCell key={m.mes} className="text-right font-semibold text-orange-500">{m.kg > 0 ? `$${(m.maniobras / m.kg).toFixed(4)}` : '—'}</TableCell>
+                ))}
+                <TableCell className="text-right font-semibold text-orange-500">
+                  {byMes.reduce((s, m) => s + m.kg, 0) > 0
+                    ? `$${(byMes.reduce((s, m) => s + m.maniobras, 0) / byMes.reduce((s, m) => s + m.kg, 0)).toFixed(4)}`
+                    : '—'}
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

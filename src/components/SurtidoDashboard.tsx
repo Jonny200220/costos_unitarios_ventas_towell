@@ -110,10 +110,11 @@ export default function SurtidoDashboard() {
 
   const byMes = useMemo(() =>
     MESES.map(m => {
-      const nomina = DETALLE.filter(r => r.seccion === SECCION && r.mes === m)
-        .reduce((s, r) => s + r.pagoPeriodo, 0);
+      const rows = DETALLE.filter(r => r.seccion === SECCION && r.mes === m);
+      const nomina = rows.reduce((s, r) => s + r.pagoPeriodo, 0);
+      const horas = rows.reduce((s, r) => s + r.horas, 0);
       const kg = pesoKgPorMes[m] ?? 0;
-      return { mes: m, total: nomina, kg, cuota: kg > 0 ? nomina / kg : 0 };
+      return { mes: m, total: nomina, horas, kg, cuota: kg > 0 ? nomina / kg : 0, cuotaMin: horas > 0 ? nomina / (horas * 60) : 0 };
     }),
     [pesoKgPorMes, DETALLE],
   );
@@ -779,6 +780,7 @@ export default function SurtidoDashboard() {
                   <TableHead className="text-white font-semibold text-right">Abril</TableHead>
                   <TableHead className="text-white font-semibold text-right">Total</TableHead>
                   <TableHead className="text-white font-semibold text-right">% del Total</TableHead>
+                  <TableHead className="text-white font-semibold text-right">Cuota ($/min)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -799,6 +801,13 @@ export default function SurtidoDashboard() {
                     <TableCell className="text-right text-muted-foreground">
                       {((r.total / RESUMEN.reduce((s, x) => s + x.total, 0)) * 100).toFixed(1)}%
                     </TableCell>
+                    <TableCell className="text-right font-semibold text-teal-600">
+                      {(() => {
+                        const rows = DETALLE.filter(d => d.seccion === r.seccion);
+                        const horas = rows.reduce((s, d) => s + d.horas, 0);
+                        return horas > 0 ? `$${(r.total / (horas * 60)).toFixed(4)}` : '—';
+                      })()}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -812,6 +821,13 @@ export default function SurtidoDashboard() {
                   <TableCell className="text-right">{fmtMXN(RESUMEN.reduce((s, r) => s + r.abr, 0))}</TableCell>
                   <TableCell className="text-right">{fmtMXN(RESUMEN.reduce((s, r) => s + r.total, 0))}</TableCell>
                   <TableCell className="text-right">100%</TableCell>
+                  <TableCell className="text-right text-teal-300">
+                    {(() => {
+                      const horas = DETALLE.reduce((s, d) => s + d.horas, 0);
+                      const total = RESUMEN.reduce((s, r) => s + r.total, 0);
+                      return horas > 0 ? `$${(total / (horas * 60)).toFixed(4)}` : '—';
+                    })()}
+                  </TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
