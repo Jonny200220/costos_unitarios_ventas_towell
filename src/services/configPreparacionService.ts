@@ -12,7 +12,8 @@ const SELECT_FIELDS = [
 export async function getConfigPreparacion(): Promise<ConfigPreparacionArticulo[]> {
   const { data, error } = await supabase
     .from('config_preparacion_articulo')
-    .select(SELECT_FIELDS);
+    .select(SELECT_FIELDS)
+    .returns<ConfigPreparacionArticulo[]>();
 
   if (error) {
     console.warn('configPreparacionService: fallback empty', error.message);

@@ -20,7 +20,8 @@ const SELECT_FIELDS = [
 export async function getPesosCliente(): Promise<PesosCliente[]> {
   const { data, error } = await supabase
     .from('pesos_cliente')
-    .select(SELECT_FIELDS);
+    .select(SELECT_FIELDS)
+    .returns<PesosCliente[]>();
 
   const savedMap = new Map<string, PesosCliente>();
   if (!error && data) {
