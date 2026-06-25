@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useNominaData } from '../hooks/useNominaData';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -13,10 +12,7 @@ import { ALL_ROWS } from '../hooks/useSalesData';
 import { usePagination } from '../hooks/usePagination';
 import TablePagination from './TablePagination';
 import { fmtMXN } from '../lib/format';
-import { getPesosCliente } from '../services/pesosService';
-import type { PesosCliente } from '../types/pesos';
-import { queryKeys } from '../lib/queryKeys';
-import { effectiveWeight } from '../lib/formulaConfig';
+import { useCostosUnitarios } from '../hooks/useCostosUnitarios';
 
 function fmt2(n: number) { return `$${n.toFixed(2)}`; }
 
@@ -39,16 +35,7 @@ const TAMANOS: string[] = ['todos', ...Array.from(new Set(ALL_ROWS.map(r => r.ta
 
 export default function ResumenDashboard() {
   const { resumen, plantilla: PLANTILLA_ROWS, loading } = useNominaData();
-
-  // ── Pesos por cliente — caché compartida con CostosUnitariosDashboard y PesosClientePage ──
-  const { data: pesosArr = [] } = useQuery({
-    queryKey: queryKeys.pesosCliente,
-    queryFn: getPesosCliente,
-  });
-  const pesosMap = useMemo(
-    () => new Map(pesosArr.map((p: PesosCliente) => [p.nombre_cliente, p])),
-    [pesosArr],
-  );
+  const { rows: costoRows, loading: loadingCostos } = useCostosUnitarios();
 
   // ── Nómina totales ─────────────────────────────────────────────────────────
   const NOMINA_TOTALES = useMemo(
@@ -108,69 +95,25 @@ export default function ResumenDashboard() {
   const CUOTA_ALM   = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Almacén']        ?? 0) / TOTAL_PESO : 0;
   const CUOTA_EMB   = TOTAL_PESO > 0 ? (NOMINA_TOTALES['Embarques']      ?? 0) / TOTAL_PESO : 0;
 
-  // ── Cálculo ponderado por cliente ──────────────────────────────────────────
+  // ── Cálculo ponderado por cliente/artículo desde useCostosUnitarios ─────────
   const baseRows = useMemo<ItemResumen[]>(() => {
-    const getVal = (cliente: string, field: keyof Omit<PesosCliente, 'nombre_cliente'>): number =>
-      pesosMap.get(cliente)?.[field] ?? 1;
-    const ew = (c: string, pF: keyof Omit<PesosCliente, 'nombre_cliente'>, tF: keyof Omit<PesosCliente, 'nombre_cliente'>) =>
-      effectiveWeight(getVal(c, pF), getVal(c, tF));
-
-    const clienteKg: Record<string, number> = {};
-    filteredRows.forEach(r => {
-      clienteKg[r.nombre_cliente] = (clienteKg[r.nombre_cliente] ?? 0) + r.peso_std;
-    });
-    const clientes = Object.keys(clienteKg);
-
-    const tAdmin = NOMINA_TOTALES['Administración'] ?? 0;
-    const tAlm   = NOMINA_TOTALES['Almacén']        ?? 0;
-    const tPrep  = NOMINA_TOTALES['Preparación']    ?? 0;
-    const tEmb   = NOMINA_TOTALES['Embarques']      ?? 0;
-
-    // Denominadores Σ(kg × peso_efectivo)
-    let dAdmin = 0, dAlm = 0, dPrep = 0, dEmb = 0, dMe = 0, dFle = 0;
-    clientes.forEach(c => {
-      const kg = clienteKg[c];
-      dAdmin += kg * ew(c, 'peso_admin',       'tiempo_admin');
-      dAlm   += kg * ew(c, 'peso_almacen',     'tiempo_almacen');
-      dPrep  += kg * ew(c, 'peso_preparacion', 'tiempo_preparacion');
-      dEmb   += kg * ew(c, 'peso_embarque',    'tiempo_embarque');
-      dMe    += kg * ew(c, 'peso_me',          'tiempo_me');
-      dFle   += kg * ew(c, 'peso_fletes',      'tiempo_fletes');
-    });
-
-    const cuotaCliente: Record<string, { admin: number; alm: number; prep: number; emb: number; me: number; fle: number }> = {};
-    clientes.forEach(c => {
-      cuotaCliente[c] = {
-        admin: dAdmin > 0 ? tAdmin      * ew(c, 'peso_admin',       'tiempo_admin')       / dAdmin : 0,
-        alm:   dAlm   > 0 ? tAlm        * ew(c, 'peso_almacen',     'tiempo_almacen')     / dAlm   : 0,
-        prep:  dPrep  > 0 ? tPrep       * ew(c, 'peso_preparacion', 'tiempo_preparacion') / dPrep  : 0,
-        emb:   dEmb   > 0 ? tEmb        * ew(c, 'peso_embarque',    'tiempo_embarque')    / dEmb   : 0,
-        me:    dMe    > 0 ? TOTAL_ME    * ew(c, 'peso_me',          'tiempo_me')          / dMe    : 0,
-        fle:   dFle   > 0 ? TOTAL_FLETE * ew(c, 'peso_fletes',      'tiempo_fletes')      / dFle   : 0,
-      };
-    });
-
-    const rowKey = viewMode === 'cliente' ? 'nombre_cliente' : 'nombre_articulo';
     const map: Record<string, {
       ventas: number; kg: number;
       adminKg: number; almKg: number; prepKg: number; embKg: number; meKg: number; fleKg: number;
     }> = {};
 
-    filteredRows.forEach(r => {
+    costoRows.forEach(r => {
       if (filtroTamano !== 'todos' && r.tamano !== filtroTamano) return;
-      const k  = r[rowKey];
-      const c  = r.nombre_cliente;
-      const cu = cuotaCliente[c] ?? { admin: 0, alm: 0, prep: 0, emb: 0, me: 0, fle: 0 };
-      const kg = r.peso_std;
+      const k = viewMode === 'cliente' ? r.nombre_cliente : r.nombre_articulo;
       if (!map[k]) map[k] = { ventas: 0, kg: 0, adminKg: 0, almKg: 0, prepKg: 0, embKg: 0, meKg: 0, fleKg: 0 };
-      map[k].ventas  += r.importe;
-      map[k].kg      += kg;
-      map[k].adminKg += kg * cu.admin;
-      map[k].almKg   += kg * cu.alm;
-      map[k].prepKg  += kg * cu.prep;
-      map[k].embKg   += kg * cu.emb;
-      map[k].meKg    += kg * cu.me;
-      map[k].fleKg   += kg * cu.fle;
+      map[k].ventas  += r.ventas;
+      map[k].kg      += r.kg;
+      map[k].adminKg += r.kg * r.cuota_admin;
+      map[k].almKg   += r.kg * r.cuota_almacen;
+      map[k].prepKg  += r.kg * r.cuota_preparacion;
+      map[k].embKg   += r.kg * r.cuota_embarque;
+      map[k].meKg    += r.kg * r.cuota_me;
+      map[k].fleKg   += r.kg * r.cuota_fletes;
     });
 
     return Object.entries(map)
@@ -186,7 +129,7 @@ export default function ResumenDashboard() {
         cuotaFlete: v.kg > 0 ? v.fleKg   / v.kg : 0,
       }))
       .sort((a, b) => b.ventas - a.ventas);
-  }, [viewMode, filtroTamano, filteredRows, NOMINA_TOTALES, TOTAL_ME, TOTAL_FLETE, pesosMap]);
+  }, [viewMode, filtroTamano, costoRows]);
 
   const data = useMemo(() => {
     const s        = search.toLowerCase();
@@ -234,7 +177,7 @@ export default function ResumenDashboard() {
   const pag      = usePagination(data, 15);
   const colLabel = viewMode === 'cliente' ? 'Cliente' : 'Artículo';
 
-  if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando datos...</div>;
+  if (loading || loadingCostos) return <div className="p-8 text-center text-muted-foreground">Cargando datos...</div>;
 
   const thC = 'text-white font-semibold text-right cursor-pointer select-none hover:opacity-80 whitespace-nowrap text-xs py-2';
   const tdC = 'py-1 text-xs';
