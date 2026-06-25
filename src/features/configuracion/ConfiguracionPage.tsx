@@ -2,6 +2,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Settings } from 'lucide-react';
 import PlantillaTable from './PlantillaTable';
 import PesosOCPage from '../pesos/PesosOCPage';
+import ConfigPreparacionPage from '../pesos/ConfigPreparacionPage';
 import type { Seccion } from '../../types/nomina';
 
 const SECCIONES: { value: Seccion; label: string; color: string }[] = [
@@ -31,6 +32,7 @@ export default function ConfiguracionPage() {
         <TabsList className="bg-white ring-1 ring-foreground/10 shadow-xs h-10 mb-6">
           <TabsTrigger value="plantilla" className="text-sm px-5">Plantilla</TabsTrigger>
           <TabsTrigger value="pesos" className="text-sm px-5">Pesos por Orden</TabsTrigger>
+          <TabsTrigger value="prep-articulo" className="text-sm px-5">Preparación por Artículo</TabsTrigger>
         </TabsList>
 
         {/* Sub-tabs de plantilla por sección */}
@@ -53,6 +55,10 @@ export default function ConfiguracionPage() {
 
         <TabsContent value="pesos" className="mt-0">
           <PesosOCPage />
+        </TabsContent>
+
+        <TabsContent value="prep-articulo" className="mt-0">
+          <ConfigPreparacionPage />
         </TabsContent>
       </Tabs>
     </div>

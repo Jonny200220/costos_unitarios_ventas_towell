@@ -19,6 +19,7 @@ import TablePagination from './TablePagination';
 import { usePagination } from '../hooks/usePagination';
 import { ALL_ROWS as VENTAS_ROWS } from '../hooks/useSalesData';
 import { fmtMXN } from '../lib/format';
+import { useCostosUnitarios } from '../hooks/useCostosUnitarios';
 
 const MESES = ['Ene', 'Feb', 'Mar', 'Abr'];
 const COLORS = ['#1e2a5e', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
@@ -26,6 +27,7 @@ const SECCION = 'Preparación';
 
 export default function PreparacionDashboard() {
   const { detalle: DETALLE, plantilla: PLANTILLA, resumen: RESUMEN, loading } = useNominaData();
+  const { rows: costoRows, loading: loadingCostos } = useCostosUnitarios();
   const [mesFilter, setMesFilter] = useState<string>('todos');
   const [puestoFilter, setPuestoFilter] = useState<string>('todos');
   const [search, setSearch] = useState<string>('');
@@ -134,64 +136,60 @@ export default function PreparacionDashboard() {
   const pag = usePagination(prepDetalle, 50);
 
   const byClientePrep = useMemo<{ cliente: string; ventas: number; peso: number; nomina: number; cuota: number }[]>(() => {
-    const map: Record<string, { ventas: number; peso: number }> = {};
-    VENTAS_ROWS.forEach(r => {
-      if (!map[r.nombre_cliente]) map[r.nombre_cliente] = { ventas: 0, peso: 0 };
-      map[r.nombre_cliente].ventas += r.importe;
-      map[r.nombre_cliente].peso += r.peso_std;
+    const map: Record<string, { ventas: number; peso: number; monto: number }> = {};
+    costoRows.forEach(r => {
+      if (!map[r.nombre_cliente]) map[r.nombre_cliente] = { ventas: 0, peso: 0, monto: 0 };
+      map[r.nombre_cliente].ventas += r.ventas;
+      map[r.nombre_cliente].peso += r.kg;
+      map[r.nombre_cliente].monto += r.kg * r.cuota_preparacion;
     });
     return Object.entries(map)
       .map(([cliente, v]) => ({
         cliente,
         ventas: v.ventas,
         peso: v.peso,
-        nomina: totalPesoKg > 0 ? (v.peso / totalPesoKg) * prepNominaTotal : 0,
-        cuota: totalPesoKg > 0 ? prepNominaTotal / totalPesoKg : 0,
+        nomina: v.monto,
+        cuota: v.peso > 0 ? v.monto / v.peso : 0,
       }))
       .sort((a, b) => b.nomina - a.nomina);
-  }, [prepNominaTotal]);
+  }, [costoRows]);
 
   const cuotaClientePag = usePagination(byClientePrep, 25);
 
-  const byArticuloPrep = useMemo<{ cliente: string; articulo: string; peso: number; ventas: number; monto: number; cuota: number }[]>(() => {
-    const map: Record<string, { peso: number; ventas: number }> = {};
-    VENTAS_ROWS.forEach(r => {
-      const key = `${r.nombre_cliente}||${r.nombre_articulo}`;
-      if (!map[key]) map[key] = { peso: 0, ventas: 0 };
-      map[key].peso += r.peso_std;
-      map[key].ventas += r.importe;
-    });
-    return Object.entries(map)
-      .map(([key, v]) => {
-        const [cliente, articulo] = key.split('||');
-        return {
-          cliente,
-          articulo,
-          peso: v.peso,
-          ventas: v.ventas,
-          monto: totalPesoKg > 0 ? (v.peso / totalPesoKg) * prepNominaTotal : 0,
-          cuota: totalPesoKg > 0 ? prepNominaTotal / totalPesoKg : 0,
-        };
-      })
-      .sort((a, b) => b.monto - a.monto);
-  }, [prepNominaTotal]);
+  const byArticuloPrep = useMemo<{ cliente: string; articulo: string; peso: number; ventas: number; monto: number; cuota: number }[]>(() =>
+    costoRows.map(r => ({
+      cliente: r.nombre_cliente,
+      articulo: `${r.nombre_articulo} — ${r.tamano}`,
+      peso: r.kg,
+      ventas: r.ventas,
+      monto: r.kg * r.cuota_preparacion,
+      cuota: r.cuota_preparacion,
+    })).sort((a, b) => b.monto - a.monto),
+    [costoRows],
+  );
 
   const byArticuloPrepPag = usePagination(byArticuloPrep, 50);
 
   const detalleLineasPrep = useMemo(() =>
-    VENTAS_ROWS.map(r => ({
-      ...r,
-      montoPrep: totalPesoKg > 0 ? (r.peso_std / totalPesoKg) * prepNominaTotal : 0,
-      cuotaPrep: totalPesoKg > 0 ? prepNominaTotal / totalPesoKg : 0,
+    costoRows.map(r => ({
+      nombre_cliente: r.nombre_cliente,
+      nombre_articulo: r.nombre_articulo,
+      tamano: r.tamano,
+      color: '',
+      mes: '',
+      importe: r.ventas,
+      peso_std: r.kg,
+      montoPrep: r.kg * r.cuota_preparacion,
+      cuotaPrep: r.cuota_preparacion,
     })),
-    [prepNominaTotal],
+    [costoRows],
   );
 
   const detalleLineasPag = usePagination(detalleLineasPrep, 50);
 
   const hayFiltros = mesFilter !== 'todos' || puestoFilter !== 'todos' || search !== '';
 
-  if (loading) return <div className="p-8 text-center text-muted-foreground">Cargando datos...</div>;
+  if (loading || loadingCostos) return <div className="p-8 text-center text-muted-foreground">Cargando datos...</div>;
 
   return (
     <div className="space-y-6">
@@ -514,7 +512,7 @@ export default function PreparacionDashboard() {
                 </TableBody>
                 <TableFooter>
                   <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold">
-                    <TableCell colSpan={5}>TOTAL ({VENTAS_ROWS.length} registros)</TableCell>
+                    <TableCell colSpan={5}>TOTAL ({detalleLineasPrep.length} registros)</TableCell>
                     <TableCell className="text-right">{fmtMXN(VENTAS_ROWS.reduce((s, r) => s + r.importe, 0))}</TableCell>
                     <TableCell className="text-right">{totalPesoKg.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 4 })}</TableCell>
                     <TableCell className="text-right text-violet-300">${cuotaTotal.toFixed(4)}</TableCell>

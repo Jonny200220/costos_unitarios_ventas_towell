@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Save, RotateCcw, Sliders, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import type { PesosCliente } from '../../types/pesos';
 import { fmtNum } from '../../lib/format';
 import { ALL_ROWS } from '../../hooks/useSalesData';
 import { FORMULA_MODE } from '../../lib/formulaConfig';
+import { WeightSelector, TiempoInput } from './components/PesosInputs';
 
 // ─── KG y OC count por cliente ────────────────────────────────────────────────
 
@@ -28,60 +29,6 @@ ALL_ROWS.forEach(r => {
     });
   }
 });
-
-// ─── Selector de peso 1-2-3-4 ────────────────────────────────────────────────
-
-function WeightSelector({ value, onChange, activeColor }: {
-  value: number;
-  onChange: (v: number) => void;
-  activeColor: string;
-}) {
-  return (
-    <div className="flex gap-0.5 justify-center">
-      {([1, 2, 3, 4] as const).map(v => (
-        <button key={v} type="button" onClick={() => onChange(v)}
-          className={[
-            'w-6 h-6 rounded text-xs font-bold transition-colors',
-            value === v
-              ? `${activeColor} text-white shadow-sm`
-              : 'bg-muted text-muted-foreground hover:bg-muted-foreground/20',
-          ].join(' ')}
-        >
-          {v}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Input de tiempo (min/kg) ─────────────────────────────────────────────────
-
-function TiempoInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const [raw, setRaw] = useState('');
-  const [focused, setFocused] = useState(false);
-
-  const display = focused ? raw : value.toFixed(1);
-
-  return (
-    <div className="flex items-center gap-1 justify-center">
-      <input
-        type="number"
-        min="0.1"
-        step="0.1"
-        value={display}
-        className="w-14 h-6 rounded border border-input bg-background px-1.5 text-xs text-center tabular-nums focus:outline-none focus:ring-1 focus:ring-[#1e2a5e]/50"
-        onFocus={() => { setRaw(value.toFixed(1)); setFocused(true); }}
-        onChange={e => setRaw(e.target.value)}
-        onBlur={() => {
-          setFocused(false);
-          const n = parseFloat(raw);
-          if (!isNaN(n) && n > 0) onChange(Math.round(n * 10) / 10);
-        }}
-      />
-      <span className="text-[10px] text-muted-foreground">min</span>
-    </div>
-  );
-}
 
 // ─── Leyenda de la fórmula activa ─────────────────────────────────────────────
 
@@ -116,7 +63,7 @@ export default function PesosClientePage() {
             <h2 className="text-lg font-bold text-[#1e2a5e]">Configuración por Cliente</h2>
             <p className="text-xs text-muted-foreground max-w-2xl">
               Define el <strong>esfuerzo (1-4)</strong> y el <strong>tiempo (min/kg)</strong> por área para cada cliente.
-              Ambos factores afectan directamente la cuota unitaria asignada.
+              Preparación funciona como fallback para los overrides por artículo.
             </p>
           </div>
         </div>
@@ -178,6 +125,7 @@ export default function PesosClientePage() {
                   {AREAS.map(a => (
                     <TableHead key={a.key} className={`${thC} border-l border-white/10`} colSpan={2}>
                       {a.label}
+                      {a.key === 'preparacion' && <span className="ml-1 text-[10px] font-normal opacity-80">ver artículos →</span>}
                     </TableHead>
                   ))}
                 </TableRow>

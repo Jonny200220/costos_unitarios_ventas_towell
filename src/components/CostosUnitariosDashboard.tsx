@@ -10,7 +10,7 @@ import { usePagination } from '../hooks/usePagination';
 import TablePagination from './TablePagination';
 import { fmtMXN, fmtNum } from '../lib/format';
 
-type SortKey = 'orden_venta' | 'nombre_cliente' | 'kg' | 'ventas' |
+type SortKey = 'nombre_cliente' | 'nombre_articulo' | 'tamano' | 'kg' | 'ventas' |
   'cuota_admin' | 'cuota_almacen' | 'cuota_preparacion' | 'cuota_embarque' |
   'cuota_me' | 'cuota_fletes' | 'cuota_total';
 
@@ -45,7 +45,7 @@ export default function CostosUnitariosDashboard() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return q
-      ? rows.filter(r => r.orden_venta.toLowerCase().includes(q) || r.nombre_cliente.toLowerCase().includes(q))
+      ? rows.filter(r => r.nombre_cliente.toLowerCase().includes(q) || r.nombre_articulo.toLowerCase().includes(q) || r.tamano.toLowerCase().includes(q))
       : rows;
   }, [rows, search]);
 
@@ -87,7 +87,7 @@ export default function CostosUnitariosDashboard() {
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Ventas</div>
             <div className="text-base font-bold text-[#1e2a5e]">{fmtMXN(totalVentas)}</div>
-            <div className="text-xs text-muted-foreground mt-1">{fmtNum(totalKg, 0)} kg · {rows.length} OC</div>
+            <div className="text-xs text-muted-foreground mt-1">{fmtNum(totalKg, 0)} kg · {rows.length} artículos</div>
           </CardContent>
         </Card>
         {COLS.map(col => (
@@ -108,7 +108,7 @@ export default function CostosUnitariosDashboard() {
 
       {/* Nota */}
       <p className="text-xs text-muted-foreground bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-        Las cuotas varían por OC según los pesos configurados en <strong>Configuración → Pesos por Orden</strong>.
+        Las cuotas varían por artículo según los pesos configurados en <strong>Configuración → Pesos por Orden</strong> y <strong>Preparación por Artículo</strong>.
         Con todos los pesos en 1 la distribución es proporcional al kg (comportamiento plano).
       </p>
 
@@ -116,7 +116,7 @@ export default function CostosUnitariosDashboard() {
       <div className="relative max-w-xs">
         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Buscar OC o cliente..."
+          placeholder="Buscar cliente, artículo o tamaño..."
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="pl-8 h-9"
@@ -129,11 +129,14 @@ export default function CostosUnitariosDashboard() {
           <Table>
             <TableHeader>
               <TableRow className="bg-[#1e2a5e] hover:bg-[#1e2a5e]">
-                <TableHead className={`${thC} text-left`} onClick={() => toggleSort('orden_venta')}>
-                  Orden Venta <SortIcon k="orden_venta" />
-                </TableHead>
                 <TableHead className={`${thC} text-left`} onClick={() => toggleSort('nombre_cliente')}>
                   Cliente <SortIcon k="nombre_cliente" />
+                </TableHead>
+                <TableHead className={`${thC} text-left`} onClick={() => toggleSort('nombre_articulo')}>
+                  Artículo <SortIcon k="nombre_articulo" />
+                </TableHead>
+                <TableHead className={`${thC} text-left`} onClick={() => toggleSort('tamano')}>
+                  Tamaño <SortIcon k="tamano" />
                 </TableHead>
                 <TableHead className={`${thC} text-right`} onClick={() => toggleSort('kg')}>
                   Kg <SortIcon k="kg" />
@@ -154,11 +157,14 @@ export default function CostosUnitariosDashboard() {
             </TableHeader>
             <TableBody>
               {pag.paged.map((r, i) => (
-                <TableRow key={r.orden_venta} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
-                  <TableCell className={`${tdC} font-mono font-medium`}>{r.orden_venta}</TableCell>
+                <TableRow key={`${r.nombre_cliente}||${r.nombre_articulo}||${r.tamano}`} className={i % 2 === 0 ? '' : 'bg-muted/30'}>
                   <TableCell className={`${tdC} max-w-[150px] truncate`} title={r.nombre_cliente}>
                     {r.nombre_cliente}
                   </TableCell>
+                  <TableCell className={`${tdC} max-w-[180px] truncate`} title={r.nombre_articulo}>
+                    {r.nombre_articulo}
+                  </TableCell>
+                  <TableCell className={`${tdC} text-muted-foreground`}>{r.tamano}</TableCell>
                   <TableCell className={`${tdC} text-right text-muted-foreground`}>{fmtNum(r.kg, 0)}</TableCell>
                   <TableCell className={`${tdC} text-right text-muted-foreground`}>{fmtMXN(r.ventas)}</TableCell>
                   {COLS.map(col => (
@@ -171,7 +177,7 @@ export default function CostosUnitariosDashboard() {
             </TableBody>
             <TableFooter>
               <TableRow className="bg-[#1e2a5e] text-white hover:bg-[#1e2a5e] font-bold text-xs">
-                <TableCell colSpan={2}>TOTAL ({sorted.length} OC)</TableCell>
+                <TableCell colSpan={3}>TOTAL ({sorted.length} artículos)</TableCell>
                 <TableCell className="text-right">{fmtNum(filtered.reduce((s, r) => s + r.kg, 0), 0)}</TableCell>
                 <TableCell className="text-right">{fmtMXN(filtered.reduce((s, r) => s + r.ventas, 0))}</TableCell>
                 {COLS.map(col => (
